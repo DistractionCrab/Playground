@@ -49,6 +49,7 @@ APlaygroundCharacter::APlaygroundCharacter()
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+	this->PerspectiveManager = CreateDefaultSubobject<UPerspectiveManager>(TEXT("Custom Perspective"));
 }
 
 void APlaygroundCharacter::BeginPlay()
@@ -95,8 +96,9 @@ void APlaygroundCharacter::Move(const FInputActionValue& Value)
 
 	if (Controller != nullptr)
 	{
-		// find out which way is forward
-		const FRotator Rotation = Controller->GetControlRotation();
+		const FRotator Rotation = this->PerspectiveManager->IsBound() ?
+			this->PerspectiveManager->GetPerspective()
+			: this->Controller->GetControlRotation();
 		const FRotator YawRotation(0, Rotation.Yaw, 0);
 
 		// get forward vector
@@ -116,7 +118,9 @@ void APlaygroundCharacter::Look(const FInputActionValue& Value)
 	// input is a Vector2D
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
 
-	if (Controller != nullptr)
+
+
+	if (Controller != nullptr && !this->PerspectiveManager->IsBound())
 	{
 		// add yaw and pitch input to controller
 		AddControllerYawInput(LookAxisVector.X);
