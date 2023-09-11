@@ -36,7 +36,11 @@ protected:
 
 public:	
 	// Called every frame
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	virtual void TickComponent(
+		float DeltaTime, 
+		ELevelTick TickType, 
+		FActorComponentTickFunction* ThisTickFunction) 
+		override;
 
 	UFUNCTION(BlueprintCallable, Category = "NPC Statistics")
 	virtual void HealthListen(const FStatisticsListenerDiff& Del);
