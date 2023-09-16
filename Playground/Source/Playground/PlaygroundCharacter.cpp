@@ -11,6 +11,12 @@
 #include "EnhancedInputSubsystems.h"
 
 
+// Singleton object declarations for linkage.
+APlaygroundCharacter::State APlaygroundCharacter::IDLE;
+APlaygroundCharacter::WalkingState APlaygroundCharacter::WALKING;
+APlaygroundCharacter::RunningState APlaygroundCharacter::RUNNING;
+
+
 //////////////////////////////////////////////////////////////////////////
 // APlaygroundCharacter
 
@@ -59,6 +65,7 @@ void APlaygroundCharacter::BeginPlay()
 	// Call the base class  
 	Super::BeginPlay();
 
+	this->CurrentState = &IDLE;
 	//Add Input Mapping Context
 	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
@@ -83,6 +90,13 @@ void APlaygroundCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 
 		//Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &APlaygroundCharacter::Move);
+		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &APlaygroundCharacter::StopMove);
+		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Canceled, this, &APlaygroundCharacter::StopMove);
+
+		// Running Init
+		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Triggered, this, &APlaygroundCharacter::RunInput);
+		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Completed, this, &APlaygroundCharacter::StopRunInput);
+		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Canceled, this, &APlaygroundCharacter::StopRunInput);
 
 		//Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &APlaygroundCharacter::Look);
@@ -91,12 +105,47 @@ void APlaygroundCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 
 }
 
+APlaygroundCharacter::State* APlaygroundCharacter::State::RunUpdate(APlaygroundCharacter* mc) {
+	return this;
+}
+
+APlaygroundCharacter::State* APlaygroundCharacter::WalkingState::RunUpdate(APlaygroundCharacter* mc) {
+	if (mc->RunPressed) {
+		return &RUNNING;
+	}
+	else {
+		return this;
+	}
+	
+}
+
+void APlaygroundCharacter::StopRunInput(const FInputActionValue& Value) {
+	this->RunPressed = false;
+	State* To = this->CurrentState->RunUpdate(this);
+	this->UpdateState(this->CurrentState, To);
+}
+
+void APlaygroundCharacter::RunInput(const FInputActionValue& Value) {
+	this->RunPressed = true;
+	State* To = this->CurrentState->RunUpdate(this);
+	this->UpdateState(this->CurrentState, To);
+}
+
+void APlaygroundCharacter::StopMove(const FInputActionValue& Value) {
+
+}
+
 void APlaygroundCharacter::Move(const FInputActionValue& Value)
 {
 	// input is a Vector2D
 	FVector2D MovementVector = Value.Get<FVector2D>();
 
-	if (Controller != nullptr)
+	State* To = this->CurrentState->AttemptMove(this);
+	this->UpdateState(this->CurrentState, To);
+
+	bool c1 = this->CurrentState->CanControl();
+	bool c2 = this->CurrentState->CanWalk();
+	if (c1 && c2 && Controller != nullptr)
 	{
 		const FRotator Rotation = this->PerspectiveManager->IsBound() ?
 			this->PerspectiveManager->GetPerspective()
@@ -131,5 +180,40 @@ void APlaygroundCharacter::Look(const FInputActionValue& Value)
 }
 
 
+void APlaygroundCharacter::UpdateState(State* From, State* To) {
+	if (From != To) {
+		this->CurrentState = To;
+		From->Exit(this);
+		To->Enter(this);
 
+		for (FStateChangeListener a : this->Listeners) {
+			a.ExecuteIfBound(From->GetState(), To->GetState());
+		}
+	}
+}
 
+APlaygroundCharacter::State* APlaygroundCharacter::State::Step(APlaygroundCharacter* mc, float delta) {
+	return this;
+}
+
+APlaygroundCharacter::State* APlaygroundCharacter::State::AttemptMove(APlaygroundCharacter* mc) {
+	if (mc->RunPressed) {
+		return &APlaygroundCharacter::RUNNING;
+	}
+	else {
+		return &APlaygroundCharacter::WALKING;
+	}
+	
+}
+
+APlaygroundCharacter::State* APlaygroundCharacter::State::StopMove(APlaygroundCharacter* mc) {
+	return this;
+}
+
+APlaygroundCharacter::State* APlaygroundCharacter::WalkingState::StopMove(APlaygroundCharacter* mc) {
+	return &APlaygroundCharacter::IDLE;
+}
+
+void  APlaygroundCharacter::RunningState::Enter(APlaygroundCharacter* mc) {
+	
+}
