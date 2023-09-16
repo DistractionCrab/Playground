@@ -35,7 +35,7 @@ void UIntVariable::TickComponent(float DeltaTime, ELevelTick TickType, FActorCom
 
 
 int UIntVariable::SetValue(int NewValue) {
-	NewValue = FMath::Clamp(NewValue, this->Min, this->Min);
+	NewValue = FMath::Clamp(NewValue, this->Min, this->Max);
 	for (FIntModifier& f : this->ChangeModifiers) {
 		if (f.IsBound()) {
 			NewValue = FMath::Clamp(f.Execute(this->Value, NewValue, this), this->Min, this->Min);
