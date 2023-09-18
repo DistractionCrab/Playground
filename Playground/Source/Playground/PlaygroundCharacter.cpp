@@ -15,6 +15,7 @@
 APlaygroundCharacter::State APlaygroundCharacter::IDLE;
 APlaygroundCharacter::WalkingState APlaygroundCharacter::WALKING;
 APlaygroundCharacter::RunningState APlaygroundCharacter::RUNNING;
+APlaygroundCharacter::AirborneState APlaygroundCharacter::AIRBORNE;
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -22,6 +23,7 @@ APlaygroundCharacter::RunningState APlaygroundCharacter::RUNNING;
 
 APlaygroundCharacter::APlaygroundCharacter()
 {
+	PrimaryActorTick.bCanEverTick = true;
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 		
@@ -76,6 +78,21 @@ void APlaygroundCharacter::BeginPlay()
 	}
 }
 
+// Called every frame
+void APlaygroundCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	if (UCharacterMovementComponent* PlayerController = Cast<UCharacterMovementComponent>(this->GetMovementComponent())) {
+		if (PlayerController->IsFalling()) {
+			this->UpdateState(&AIRBORNE);
+		}
+		else {
+			this->UpdateState(this->CurrentState->Step(this, DeltaTime));
+		}
+	}
+}
+
+
 //////////////////////////////////////////////////////////////////////////
 // Input
 
@@ -85,7 +102,7 @@ void APlaygroundCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 	if (UEnhancedInputComponent* EnhancedInputComponent = CastChecked<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
 		//Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Triggered, this, &ACharacter::Jump);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &APlaygroundCharacter::JumpInput);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
 		//Moving
@@ -94,7 +111,7 @@ void APlaygroundCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Canceled, this, &APlaygroundCharacter::StopMove);
 
 		// Running Init
-		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Triggered, this, &APlaygroundCharacter::RunInput);
+		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Started, this, &APlaygroundCharacter::RunInput);
 		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Completed, this, &APlaygroundCharacter::StopRunInput);
 		EnhancedInputComponent->BindAction(RunAction, ETriggerEvent::Canceled, this, &APlaygroundCharacter::StopRunInput);
 
@@ -119,34 +136,48 @@ APlaygroundCharacter::State* APlaygroundCharacter::WalkingState::RunUpdate(APlay
 	
 }
 
+void APlaygroundCharacter::JumpInput(const FInputActionValue& Value) {
+	ACharacter::Jump();
+
+	if (this->CurrentState->CanControl()) {
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f,
+			FColor::Yellow, FString::Printf(
+				TEXT("Changing to Airborne?")));
+		this->UpdateState(&AIRBORNE);
+	}
+}
+
 void APlaygroundCharacter::StopRunInput(const FInputActionValue& Value) {
 	this->RunPressed = false;
 	State* To = this->CurrentState->RunUpdate(this);
-	this->UpdateState(this->CurrentState, To);
+	this->UpdateState(To);
 }
 
 void APlaygroundCharacter::RunInput(const FInputActionValue& Value) {
 	this->RunPressed = true;
 	State* To = this->CurrentState->RunUpdate(this);
-	this->UpdateState(this->CurrentState, To);
+	this->UpdateState(To);
 }
 
 void APlaygroundCharacter::StopMove(const FInputActionValue& Value) {
-
+	this->UpdateState(this->CurrentState->StopMove(this));
 }
 
 void APlaygroundCharacter::Move(const FInputActionValue& Value)
 {
+	
+	
 	// input is a Vector2D
-	FVector2D MovementVector = Value.Get<FVector2D>();
-
-	State* To = this->CurrentState->AttemptMove(this);
-	this->UpdateState(this->CurrentState, To);
+	FVector2D MovementVector = this->CurrentState->ModifyMovement(this, Value.Get<FVector2D>());	
 
 	bool c1 = this->CurrentState->CanControl();
 	bool c2 = this->CurrentState->CanWalk();
 	if (c1 && c2 && Controller != nullptr)
 	{
+		State* To = this->CurrentState->AttemptMove(this);
+		this->UpdateState(To);
+
+
 		const FRotator Rotation = this->PerspectiveManager->IsBound() ?
 			this->PerspectiveManager->GetPerspective()
 			: this->Controller->GetControlRotation();
@@ -169,8 +200,6 @@ void APlaygroundCharacter::Look(const FInputActionValue& Value)
 	// input is a Vector2D
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
 
-
-
 	if (Controller != nullptr && !this->PerspectiveManager->IsBound())
 	{
 		// add yaw and pitch input to controller
@@ -180,13 +209,26 @@ void APlaygroundCharacter::Look(const FInputActionValue& Value)
 }
 
 
-void APlaygroundCharacter::UpdateState(State* From, State* To) {
-	if (From != To) {
+void APlaygroundCharacter::UpdateState(State* To) {
+	State* From = this->CurrentState;
+	if (From != To) {		
 		this->CurrentState = To;
 		From->Exit(this);
 		To->Enter(this);
 
-		for (FStateChangeListener a : this->Listeners) {
+		/*
+		if (GEngine) {
+			FString ToName = UEnum::GetValueAsString(From->GetState());
+			FString FromName = UEnum::GetValueAsString(To->GetState());
+			GEngine->AddOnScreenDebugMessage(-1, 15.0f,
+				FColor::Yellow, FString::Printf(
+					TEXT("Changing from %s to %s"), 
+					*ToName, 
+					*FromName));
+		}
+		*/
+
+		for (const FStateChangeListener& a : this->Listeners) {
 			a.ExecuteIfBound(From->GetState(), To->GetState());
 		}
 	}
@@ -214,6 +256,38 @@ APlaygroundCharacter::State* APlaygroundCharacter::WalkingState::StopMove(APlayg
 	return &APlaygroundCharacter::IDLE;
 }
 
-void  APlaygroundCharacter::RunningState::Enter(APlaygroundCharacter* mc) {
+
+
+FVector2D APlaygroundCharacter::State::ModifyMovement(APlaygroundCharacter* mc, FVector2D fv) { 
+	return FVector2D::ZeroVector; 
+}
+
+FVector2D APlaygroundCharacter::WalkingState::ModifyMovement(APlaygroundCharacter* mc, FVector2D fv) { 
+	return fv/mc->RunningScale; 
+}
+
+FVector2D APlaygroundCharacter::RunningState::ModifyMovement(APlaygroundCharacter* mc, FVector2D fv) { 
+	return fv; 
+}
+
+void  APlaygroundCharacter::AirborneState::Enter(APlaygroundCharacter* mc) {
 	
+}
+
+APlaygroundCharacter::State* APlaygroundCharacter::State::AttemptJump(APlaygroundCharacter* mc) {
+	return &APlaygroundCharacter::AIRBORNE;
+}
+
+APlaygroundCharacter::State* APlaygroundCharacter::AirborneState::Step(APlaygroundCharacter* mc, float delta) {
+	if (UCharacterMovementComponent* PlayerController = Cast<UCharacterMovementComponent>(mc->GetMovementComponent())) {
+		if (PlayerController->IsFalling()) {
+			return this;
+		}
+		else {
+			return &IDLE;
+		}
+	}
+	else {
+		return this;
+	}	
 }

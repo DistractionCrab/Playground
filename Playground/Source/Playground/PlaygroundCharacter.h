@@ -11,9 +11,10 @@
 
 UENUM(BlueprintType)
 enum class EPlaygroundCharacterState : uint8 {
-	IDLE       UMETA(DisplayName = "Idle"),
+	IDLE           UMETA(DisplayName = "Idle"),
 	WALKING        UMETA(DisplayName = "Walking"),
 	RUNNING        UMETA(DisplayName = "Running"),
+	AIRBORNE       UMETA(DisplayName = "Airborne"),
 };
 
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FStateChangeListener, EPlaygroundCharacterState, From, EPlaygroundCharacterState, To);
@@ -28,34 +29,53 @@ protected:
 	static class State {
 	public:
 		virtual EPlaygroundCharacterState GetState() { return EPlaygroundCharacterState::IDLE; }
+		/** Called upon transitioning to this state. **/
 		virtual void Enter(APlaygroundCharacter* mc) {}
+		/** Called upon exiting this state. **/
 		virtual void Exit(APlaygroundCharacter* mc) {}
+		/** Call in Tick on the Character. **/
 		virtual State* Step(APlaygroundCharacter* mc, float delta);
+
 		virtual State* AttemptMove(APlaygroundCharacter* mc);
 		virtual State* StopMove(APlaygroundCharacter* mc);
 		virtual State* RunUpdate(APlaygroundCharacter* mc);
-		virtual FVector2D ModifyMovement(FVector2D fv) { return FVector2D::ZeroVector; }
+		virtual State* AttemptJump(APlaygroundCharacter* mc);
+
+		virtual FVector2D ModifyMovement(APlaygroundCharacter* mc, FVector2D fv);
 		virtual bool CanControl() { return true; }
 		virtual bool CanWalk() { return true; }
 	} IDLE;
+
+	static class AirborneState : public State {
+		virtual EPlaygroundCharacterState GetState() { return EPlaygroundCharacterState::AIRBORNE; }
+		virtual State* Step(APlaygroundCharacter* mc, float delta) override;
+		virtual void Enter(APlaygroundCharacter* mc) override;
+		virtual bool CanControl() { return false; }
+		virtual bool CanWalk() { return false; }
+	} AIRBORNE;
 
 	/* Walking state which will control the player walking and will. */
 	static class WalkingState : public State {
 	public:
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::WALKING; }
 		virtual State* StopMove(APlaygroundCharacter* mc) override;
-		virtual FVector2D ModifyMovement(FVector2D fv) override { return fv; }
+		virtual FVector2D ModifyMovement(APlaygroundCharacter* mc, FVector2D fv) override;
 		virtual State* RunUpdate(APlaygroundCharacter* mc) override;
 	} WALKING;
 
 	static class RunningState : public WalkingState {
 	public:
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::RUNNING; }
-		virtual void Enter(APlaygroundCharacter* mc) override;
+		virtual FVector2D ModifyMovement(APlaygroundCharacter* mc, FVector2D fv) override;
 	} RUNNING;
 
 
 private:
+	/** The scaling factor for how much faster running is than walking. **/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character Physics",
+		meta = (AllowPrivateAccess = "true"))
+	float RunningScale = 1.0;
+
 	/** Camera boom positioning the camera behind the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	class UPerspectiveManager* PerspectiveManager;
@@ -113,10 +133,16 @@ protected:
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
 
+	/** Called for looking input */
+	virtual void JumpInput(const FInputActionValue& Value);
+
 	/** Called when transitioning states. Handles all listener callbacks  **/
-	void UpdateState(State* From, State* To);
+	void UpdateState(State* To);
 
 protected:
+	// Called every frame
+	virtual void Tick(float DeltaTime) override;
+
 	// APawn interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	
@@ -129,6 +155,9 @@ public:
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
-	
+	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
+	virtual void StateListen(const FStateChangeListener& Del) {
+		this->Listeners.Add(Del);
+	}
 };
 
