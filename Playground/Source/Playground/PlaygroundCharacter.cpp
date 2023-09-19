@@ -140,9 +140,6 @@ void APlaygroundCharacter::JumpInput(const FInputActionValue& Value) {
 	ACharacter::Jump();
 
 	if (this->CurrentState->CanControl()) {
-		GEngine->AddOnScreenDebugMessage(-1, 15.0f,
-			FColor::Yellow, FString::Printf(
-				TEXT("Changing to Airborne?")));
 		this->UpdateState(&AIRBORNE);
 	}
 }
@@ -215,18 +212,6 @@ void APlaygroundCharacter::UpdateState(State* To) {
 		this->CurrentState = To;
 		From->Exit(this);
 		To->Enter(this);
-
-		/*
-		if (GEngine) {
-			FString ToName = UEnum::GetValueAsString(From->GetState());
-			FString FromName = UEnum::GetValueAsString(To->GetState());
-			GEngine->AddOnScreenDebugMessage(-1, 15.0f,
-				FColor::Yellow, FString::Printf(
-					TEXT("Changing from %s to %s"), 
-					*ToName, 
-					*FromName));
-		}
-		*/
 
 		for (const FStateChangeListener& a : this->Listeners) {
 			a.ExecuteIfBound(From->GetState(), To->GetState());
