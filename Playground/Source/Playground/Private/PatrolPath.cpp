@@ -28,18 +28,41 @@ void APatrolPath::Tick(float DeltaTime)
 }
 
 AActor* APatrolPath::FindClosestPoint(AActor* Patroller) {
+	if (Patroller == nullptr) {
+		return this;
+	}
+
 	AActor* Goal = Patroller;
 	float Dist = this->LostDistance * this->LostDistance;
 
 	for (AActor* p : this->PatrolPoints) {
 		float DSquared = FVector::DistSquared(p->GetActorLocation(), Patroller->GetActorLocation());
-		if (GEngine)
-			GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, 
-				FString::Printf(TEXT("DSquared: %f with %s name. Dist = %f"), DSquared, *p->GetName(), Dist));
 		if (DSquared < Dist) {
 			Goal = p;
 			Dist = DSquared;
 		}
 	}
+	return Goal;
+}
+
+int APatrolPath::FindClosestIndex(AActor* Patroller) {
+	if (Patroller == nullptr) {
+		return -1;
+	} else if (this->PatrolPoints.Num() == 0) {
+		return -1;
+	}
+
+	int Goal = 0;
+	float Dist = this->LostDistance * this->LostDistance;
+
+	for (int i = 0; i < this->PatrolPoints.Num(); ++i) {
+		AActor* p = this->PatrolPoints[i];
+		float DSquared = FVector::DistSquared(p->GetActorLocation(), Patroller->GetActorLocation());
+		if (DSquared < Dist) {
+			Goal = i;
+			Dist = DSquared;
+		}
+	}
+
 	return Goal;
 }

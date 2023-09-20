@@ -34,4 +34,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "AI")
 	virtual AActor* FindClosestPoint(AActor* Patroller);
+
+	UFUNCTION(BlueprintCallable, Category = "AI")
+	virtual int FindClosestIndex(AActor* Patroller);
+
+	UFUNCTION(BlueprintPure, Category = "AI")
+	AActor* Get(int i) {
+		return this->PatrolPoints[i];
+	}
 };
