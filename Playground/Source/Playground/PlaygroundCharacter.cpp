@@ -10,12 +10,8 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 
-
-// Singleton object declarations for linkage.
-APlaygroundCharacter::State APlaygroundCharacter::IDLE;
-APlaygroundCharacter::WalkingState APlaygroundCharacter::WALKING;
-APlaygroundCharacter::RunningState APlaygroundCharacter::RUNNING;
-APlaygroundCharacter::AirborneState APlaygroundCharacter::AIRBORNE;
+typedef PlaygroundCharacterStateMachine Machine;
+typedef PlaygroundCharacterStateMachine::PlaygroundCharacterState State;
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -67,8 +63,6 @@ void APlaygroundCharacter::BeginPlay()
 	// Call the base class  
 	Super::BeginPlay();
 
-	this->CurrentState = &IDLE;
-	//Add Input Mapping Context
 	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
@@ -82,16 +76,23 @@ void APlaygroundCharacter::BeginPlay()
 void APlaygroundCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	if (UCharacterMovementComponent* PlayerController = Cast<UCharacterMovementComponent>(this->GetMovementComponent())) {
-		if (PlayerController->IsFalling()) {
-			this->UpdateState(&AIRBORNE);
+	this->Machine.Step(this, DeltaTime);
+}
+
+
+void APlaygroundCharacter::PostEditChangeProperty(struct FPropertyChangedEvent& e) {
+	Super::PostEditChangeProperty(e);
+
+	if (e.Property != nullptr) {
+		if (e.Property->GetFName() == GET_MEMBER_NAME_CHECKED(APlaygroundCharacter, WalkingSpeed)) {
+			this->Machine.WalkingSpeed = this->WalkingSpeed;			
+			//UE_LOG(LogTemp, Warning, TEXT("--------- Change -----------"));
 		}
-		else {
-			this->UpdateState(this->CurrentState->Step(this, DeltaTime));
+		else if (e.Property->GetFName() == GET_MEMBER_NAME_CHECKED(APlaygroundCharacter, RunningSpeed)) {
+			this->Machine.RunningSpeed = this->RunningSpeed;
 		}
 	}
 }
-
 
 //////////////////////////////////////////////////////////////////////////
 // Input
@@ -118,78 +119,39 @@ void APlaygroundCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 		//Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &APlaygroundCharacter::Look);
 
+		// Spell Casting
+		EnhancedInputComponent->BindAction(SpellCastAction, ETriggerEvent::Started, this, &APlaygroundCharacter::SpellCastInput);
 	}
 
-}
-
-APlaygroundCharacter::State* APlaygroundCharacter::State::RunUpdate(APlaygroundCharacter* mc) {
-	return this;
-}
-
-APlaygroundCharacter::State* APlaygroundCharacter::WalkingState::RunUpdate(APlaygroundCharacter* mc) {
-	if (mc->RunPressed) {
-		return &RUNNING;
-	}
-	else {
-		return this;
-	}
-	
 }
 
 void APlaygroundCharacter::JumpInput(const FInputActionValue& Value) {
-	ACharacter::Jump();
-
-	if (this->CurrentState->CanControl()) {
-		this->UpdateState(&AIRBORNE);
-	}
+	this->Machine.AttemptJump(this);
 }
 
 void APlaygroundCharacter::StopRunInput(const FInputActionValue& Value) {
-	this->RunPressed = false;
-	State* To = this->CurrentState->RunUpdate(this);
-	this->UpdateState(To);
+	this->Machine.RunPressed = false;
+	this->Machine.RunUpdate(this);
 }
 
 void APlaygroundCharacter::RunInput(const FInputActionValue& Value) {
-	this->RunPressed = true;
-	State* To = this->CurrentState->RunUpdate(this);
-	this->UpdateState(To);
+	this->Machine.RunPressed = true;
+	this->Machine.RunUpdate(this);
 }
 
 void APlaygroundCharacter::StopMove(const FInputActionValue& Value) {
-	this->UpdateState(this->CurrentState->StopMove(this));
+	this->Machine.StopMove(this);
+	//this->UpdateState(this->CurrentState->StopMove(this));
 }
 
-void APlaygroundCharacter::Move(const FInputActionValue& Value)
+void APlaygroundCharacter::SpellCastInput(const FInputActionValue& Value)
 {
-	
-	
-	// input is a Vector2D
-	FVector2D MovementVector = this->CurrentState->ModifyMovement(this, Value.Get<FVector2D>());	
-
-	bool c1 = this->CurrentState->CanControl();
-	bool c2 = this->CurrentState->CanWalk();
-	if (c1 && c2 && Controller != nullptr)
-	{
-		State* To = this->CurrentState->AttemptMove(this);
-		this->UpdateState(To);
 
 
-		const FRotator Rotation = this->PerspectiveManager->IsBound() ?
-			this->PerspectiveManager->GetPerspective()
-			: this->Controller->GetControlRotation();
-		const FRotator YawRotation(0, Rotation.Yaw, 0);
-
-		// get forward vector
-		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-	
-		// get right vector 
-		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-
-		// add movement 
-		AddMovementInput(ForwardDirection, MovementVector.Y);
-		AddMovementInput(RightDirection, MovementVector.X);
-	}
+}
+void APlaygroundCharacter::Move(const FInputActionValue& Value)	{	
+	this->Machine.InputAxis = Value.Get<FVector2D>();
+	this->Machine.AttemptMove(this);
 }
 
 void APlaygroundCharacter::Look(const FInputActionValue& Value)
@@ -205,74 +167,124 @@ void APlaygroundCharacter::Look(const FInputActionValue& Value)
 	}
 }
 
+// -------------------------- State Machine Idle State Implementation --------------------------
 
-void APlaygroundCharacter::UpdateState(State* To) {
-	State* From = this->CurrentState;
-	if (From != To) {		
-		this->CurrentState = To;
-		From->Exit(this);
-		To->Enter(this);
-
-		for (const FStateChangeListener& a : this->Listeners) {
-			a.ExecuteIfBound(From->GetState(), To->GetState());
-		}
-	}
-}
-
-APlaygroundCharacter::State* APlaygroundCharacter::State::Step(APlaygroundCharacter* mc, float delta) {
-	return this;
-}
-
-APlaygroundCharacter::State* APlaygroundCharacter::State::AttemptMove(APlaygroundCharacter* mc) {
-	if (mc->RunPressed) {
-		return &APlaygroundCharacter::RUNNING;
-	}
-	else {
-		return &APlaygroundCharacter::WALKING;
-	}
-	
-}
-
-APlaygroundCharacter::State* APlaygroundCharacter::State::StopMove(APlaygroundCharacter* mc) {
-	return this;
-}
-
-APlaygroundCharacter::State* APlaygroundCharacter::WalkingState::StopMove(APlaygroundCharacter* mc) {
-	return &APlaygroundCharacter::IDLE;
-}
-
-
-
-FVector2D APlaygroundCharacter::State::ModifyMovement(APlaygroundCharacter* mc, FVector2D fv) { 
-	return FVector2D::ZeroVector; 
-}
-
-FVector2D APlaygroundCharacter::WalkingState::ModifyMovement(APlaygroundCharacter* mc, FVector2D fv) { 
-	return fv/mc->RunningScale; 
-}
-
-FVector2D APlaygroundCharacter::RunningState::ModifyMovement(APlaygroundCharacter* mc, FVector2D fv) { 
-	return fv; 
-}
-
-void  APlaygroundCharacter::AirborneState::Enter(APlaygroundCharacter* mc) {
-	
-}
-
-APlaygroundCharacter::State* APlaygroundCharacter::State::AttemptJump(APlaygroundCharacter* mc) {
-	return &APlaygroundCharacter::AIRBORNE;
-}
-
-APlaygroundCharacter::State* APlaygroundCharacter::AirborneState::Step(APlaygroundCharacter* mc, float delta) {
-	if (UCharacterMovementComponent* PlayerController = Cast<UCharacterMovementComponent>(mc->GetMovementComponent())) {
-		if (PlayerController->IsFalling()) {
-			return this;
-		}
-		else {
-			return &IDLE;
-		}
+State* Machine::Idle::Step(APlaygroundCharacter* mc, float DeltaTime) {
+	if (mc->GetCharacterMovement()->IsFalling()) {
+		return &this->Owner->AIRBORNE;
 	}
 	else {
 		return this;
+	}
+}
+
+State* Machine::Idle::AttemptMove(APlaygroundCharacter* mc) {
+	if (this->Owner->RunPressed) {
+		return &this->Owner->RUNNING;
+	}
+	else {
+		return &this->Owner->WALKING;
+	}
+	
+}
+State* Machine::Idle::StopMove(APlaygroundCharacter* mc) {
+	return this;
+}
+
+State* Machine::Idle::AttemptJump(APlaygroundCharacter* mc){
+	return &this->Owner->AIRBORNE;
+}
+
+// -------------------------- State Machine Walking State Implementation --------------------------
+
+State* Machine::Walking::AttemptMove(APlaygroundCharacter* mc) {
+	this->ApplyMovement(mc, this->Owner->InputAxis);
+	return this;
+}
+State* Machine::Walking::StopMove(APlaygroundCharacter* mc) {
+	return &this->Owner->IDLE;
+}
+State* Machine::Walking::RunUpdate(APlaygroundCharacter* mc) {
+	if (this->Owner->RunPressed) {
+		return &this->Owner->RUNNING;
+	}
+	else {
+		return this;
+	}
+}
+State* Machine::Walking::AttemptJump(APlaygroundCharacter* mc){
+	return &this->Owner->AIRBORNE;
+}
+
+State* Machine::Walking::Enter(APlaygroundCharacter* mc) {
+	if (this->Owner->RunPressed) {
+		return &this->Owner->RUNNING;
+	}
+	else {
+		mc->GetCharacterMovement()->MaxWalkSpeed = this->Owner->WalkingSpeed;
+		this->ApplyMovement(mc, this->Owner->InputAxis);
+		return this;
 	}	
+}
+
+void Machine::Walking::ApplyMovement(APlaygroundCharacter* mc, FVector2D Input) {
+	FRotator Rotation;
+
+	auto Perspective = mc->GetPerspective();
+	if (Perspective->IsBound()) {
+		Rotation = Perspective->GetPerspective();
+	} else {
+		Rotation = mc->Controller->GetControlRotation();
+	}
+	const FRotator YawRotation(0, Rotation.Yaw, 0);
+
+	// get forward vector
+	const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+
+	// get right vector 
+	const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+
+	// add movement 
+	mc->AddMovementInput(ForwardDirection, Input.Y);
+	mc->AddMovementInput(RightDirection, Input.X);
+}
+
+// -------------------------- State Machine Running State Implementation --------------------------
+
+State* Machine::Running::Enter(APlaygroundCharacter* mc) {
+	if (this->Owner->RunPressed) {
+		mc->GetCharacterMovement()->MaxWalkSpeed = this->Owner->RunningSpeed;
+		this->ApplyMovement(mc, this->Owner->InputAxis);
+		return this;		
+	}
+	else {
+		return &this->Owner->WALKING;		
+	}
+}
+
+
+State* Machine::Running::RunUpdate(APlaygroundCharacter* mc) {
+	if (this->Owner->RunPressed) {
+		return this;
+	}
+	else {
+		return &this->Owner->WALKING;
+	}	
+}
+
+// -------------------------- State Machine Airborne State Implementation --------------------------
+
+State* Machine::Airborne::Step(APlaygroundCharacter* mc, float DeltaTime) {
+	if (mc->GetCharacterMovement()->IsFalling()) {
+		return this;
+	}
+	else {
+		return &this->Owner->IDLE;
+	}
+}
+State* Machine::Airborne::Enter(APlaygroundCharacter* mc) {
+	if (!mc->GetCharacterMovement()->IsFalling()) {
+		mc->Jump();
+	}
+	return this;
 }
