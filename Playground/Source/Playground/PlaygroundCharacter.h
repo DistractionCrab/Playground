@@ -77,6 +77,10 @@ public:
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::AIRBORNE; }
 	} AIRBORNE;
 
+	class Casting : public PlaygroundCharacterState {
+
+	} CASTING;
+
 	PlaygroundCharacterState* CurrentState;
 
 public:
