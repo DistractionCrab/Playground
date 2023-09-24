@@ -8,11 +8,16 @@ This project is intended as both a large demonstration of implementations in Unr
 - Interactive objects system and API
 - Chasing AI
 
+# Started
+- Village/Town design
+- RPG Mechanics
+- - Factions
+- - Spell effects and system
+- Character attack animation system.
 
 # Tasks
 
 - Develop dynamical grass system based off of Ghost of Tsushima's bezier approach.
-- Add in souls-like RPG elements and animations for characters
 - Develop custom gravitational orientations for walking on walls.
 - Make the chasing AI attack in various ways.
 - Object Pooling system for projectiles
