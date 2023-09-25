@@ -23,6 +23,7 @@ enum class EPlaygroundCharacterState : uint8 {
 
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FStateChangeListener, EPlaygroundCharacterState, From, EPlaygroundCharacterState, To);
 
+
 class PlaygroundCharacterStateMachine {
 public:
 	bool RunPressed = false;
@@ -43,13 +44,15 @@ public:
 		virtual PlaygroundCharacterState* StopMove(APlaygroundCharacter* mc) { return this; }
 		virtual PlaygroundCharacterState* RunUpdate(APlaygroundCharacter* mc) { return this; }
 		virtual PlaygroundCharacterState* AttemptJump(APlaygroundCharacter* mc) { return this; }
+		virtual PlaygroundCharacterState* AttemptCast(APlaygroundCharacter* mc) { return this; }
+		virtual PlaygroundCharacterState* FinishCast(APlaygroundCharacter* mc) { return this; }
 	};
 
 	class Idle: public PlaygroundCharacterState {
 		virtual PlaygroundCharacterState* Step(APlaygroundCharacter* mc, float DeltaTime) override;
 		virtual PlaygroundCharacterState* AttemptMove(APlaygroundCharacter* mc) override;
-		virtual PlaygroundCharacterState* StopMove(APlaygroundCharacter* mc) override;
 		virtual PlaygroundCharacterState* AttemptJump(APlaygroundCharacter* mc) override;
+		virtual PlaygroundCharacterState* AttemptCast(APlaygroundCharacter* mc) override { return &this->Owner->CASTING; }
 	} IDLE;
 
 	class Walking: public PlaygroundCharacterState {
@@ -59,7 +62,9 @@ public:
 		virtual PlaygroundCharacterState* StopMove(APlaygroundCharacter* mc) override;
 		virtual PlaygroundCharacterState* RunUpdate(APlaygroundCharacter* mc) override;
 		virtual PlaygroundCharacterState* AttemptJump(APlaygroundCharacter* mc) override;
+		virtual PlaygroundCharacterState* AttemptCast(APlaygroundCharacter* mc) override { return &this->Owner->CASTING; }
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::WALKING; }
+		
 
 		virtual void ApplyMovement(APlaygroundCharacter* mc, FVector2D Input);
 	} WALKING;
@@ -78,10 +83,27 @@ public:
 	} AIRBORNE;
 
 	class Casting : public PlaygroundCharacterState {
-
+		virtual PlaygroundCharacterState* FinishCast(APlaygroundCharacter* mc) { return &this->Owner->IDLE; }
+		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::SPELLCAST; }
 	} CASTING;
 
 	PlaygroundCharacterState* CurrentState;
+
+private:
+	struct Transition {
+	private:
+		int ID = 0;
+
+	public:
+		int EnterTransition() {
+			this->ID += 1;
+			return ID;
+		}
+
+		bool Valid(int OID) {
+			return OID == this->ID;
+		}
+	} TRANSITION;
 
 public:
 	PlaygroundCharacterStateMachine() {
@@ -90,6 +112,7 @@ public:
 		this->WALKING.Owner = this;
 		this->RUNNING.Owner = this;
 		this->AIRBORNE.Owner = this;
+		this->CASTING.Owner = this;
 	}
 
 	void BeginPlay() {
@@ -102,26 +125,21 @@ public:
 	void StopMove(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->StopMove(mc), mc); }
 	void RunUpdate(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->RunUpdate(mc), mc); }
 	void AttemptJump(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->AttemptJump(mc), mc); }
+	void AttemptCast(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->AttemptCast(mc), mc); }
+	void FinishCast(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->FinishCast(mc), mc); }
 
-private:
-	void UpdateState(PlaygroundCharacterState* To, APlaygroundCharacter* mc) {
-		PlaygroundCharacterState* From = this->CurrentState;
-		if (From != To) {
-			From->Exit(mc);
-			auto Check = To->Enter(mc);
-
-			if (Check == To) {
-				for (const FStateChangeListener& a : this->Listeners) {
-					a.ExecuteIfBound(From->GetState(), To->GetState());
-				}
-				this->CurrentState = To;
-			}
-			else {
-				this->UpdateState(Check, mc);
-			}
-			
+	void ForceState(EPlaygroundCharacterState e, APlaygroundCharacter* mc) {
+		switch (e) {
+			case EPlaygroundCharacterState::IDLE: this->UpdateState(&this->IDLE, mc); break;
+			case EPlaygroundCharacterState::WALKING: this->UpdateState(&this->WALKING, mc); break;
+			case EPlaygroundCharacterState::RUNNING: this->UpdateState(&this->RUNNING, mc); break;
+			case EPlaygroundCharacterState::AIRBORNE: this->UpdateState(&this->AIRBORNE, mc); break;
+			case EPlaygroundCharacterState::SPELLCAST: this->UpdateState(&this->CASTING, mc); break;
 		}
 	}
+
+private:
+	void UpdateState(PlaygroundCharacterState* To, APlaygroundCharacter* mc);
 };
 
 
@@ -231,6 +249,17 @@ public:
 	virtual void StateListen(const FStateChangeListener& Del) {
 		this->Machine.Listeners.Add(Del);
 	}
+
+	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
+	virtual void FinishCast();
+
+	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
+	void ForceState(EPlaygroundCharacterState e) { this->Machine.ForceState(e, this); }
+
+	UFUNCTION(BlueprintNativeEvent, Category = "PlaygroundCharacter")
+	void StartCast();
+
+	virtual void StartCast_Implementation();
 
 	FORCEINLINE PlaygroundCharacterStateMachine* GetMachine() { return &this->Machine; }
 

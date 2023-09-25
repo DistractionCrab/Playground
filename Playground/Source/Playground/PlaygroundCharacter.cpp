@@ -13,6 +13,31 @@
 typedef PlaygroundCharacterStateMachine Machine;
 typedef PlaygroundCharacterStateMachine::PlaygroundCharacterState State;
 
+// -------------------------------- State Machine ------------------------
+
+void Machine::UpdateState(PlaygroundCharacterState* To, APlaygroundCharacter* mc) {
+	int TID = this->TRANSITION.EnterTransition();
+	PlaygroundCharacterState* From = this->CurrentState;
+	if (From != To) {
+		From->Exit(mc);
+		auto Check = To->Enter(mc);
+
+		if (Check == To) {
+			this->CurrentState = To;
+			for (const FStateChangeListener& a : this->Listeners) {
+				a.ExecuteIfBound(From->GetState(), To->GetState());
+				if (!this->TRANSITION.Valid(TID)) {
+					break;
+				}
+			}				
+		}
+		else {
+			this->UpdateState(Check, mc);
+		}
+		
+	}
+}
+
 
 //////////////////////////////////////////////////////////////////////////
 // APlaygroundCharacter
@@ -146,8 +171,7 @@ void APlaygroundCharacter::StopMove(const FInputActionValue& Value) {
 
 void APlaygroundCharacter::SpellCastInput(const FInputActionValue& Value)
 {
-
-
+	this->StartCast();
 }
 void APlaygroundCharacter::Move(const FInputActionValue& Value)	{	
 	this->Machine.InputAxis = Value.Get<FVector2D>();
@@ -165,6 +189,18 @@ void APlaygroundCharacter::Look(const FInputActionValue& Value)
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
 	}
+}
+
+void APlaygroundCharacter::FinishCast() {
+	if(GEngine)
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("FinishCast Called!!"));
+	this->Machine.FinishCast(this); 
+}
+
+void APlaygroundCharacter::StartCast_Implementation() {
+	if(GEngine)
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("StartCast_Implementation called!"));
+	this->Machine.AttemptCast(this);
 }
 
 // -------------------------- State Machine Idle State Implementation --------------------------
@@ -186,9 +222,6 @@ State* Machine::Idle::AttemptMove(APlaygroundCharacter* mc) {
 		return &this->Owner->WALKING;
 	}
 	
-}
-State* Machine::Idle::StopMove(APlaygroundCharacter* mc) {
-	return this;
 }
 
 State* Machine::Idle::AttemptJump(APlaygroundCharacter* mc){
