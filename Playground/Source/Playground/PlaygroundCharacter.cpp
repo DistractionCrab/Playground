@@ -192,14 +192,10 @@ void APlaygroundCharacter::Look(const FInputActionValue& Value)
 }
 
 void APlaygroundCharacter::FinishCast() {
-	if(GEngine)
-		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("FinishCast Called!!"));
 	this->Machine.FinishCast(this); 
 }
 
 void APlaygroundCharacter::StartCast_Implementation() {
-	if(GEngine)
-		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("StartCast_Implementation called!"));
 	this->Machine.AttemptCast(this);
 }
 
