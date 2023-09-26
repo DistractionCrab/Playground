@@ -28,6 +28,15 @@ void UPerspectiveManager::TickComponent(float DeltaTime, ELevelTick TickType, FA
 	this->CurrentInterpolation += DeltaTime;
 }
 
+void UPerspectiveManager::ResetPerspective() { 
+	this->PerspectiveCopy = nullptr;
+	this->PerspectiveCopyComponent = nullptr;
+}
+
+bool UPerspectiveManager::IsBound() { 
+	return this->PerspectiveCopy != nullptr || this->PerspectiveCopyComponent != nullptr;  
+}
+
 FRotator UPerspectiveManager::GetBasePerspective() {
 	if (this->DefaultPerspective == nullptr) {
 		AActor* Owner = this->GetOwner();
@@ -54,8 +63,20 @@ FRotator UPerspectiveManager::GetBasePerspective() {
 
 FRotator UPerspectiveManager::GetPerspective() {
 	
+	if (this->PerspectiveCopyComponent != nullptr) {
+		FRotator Base = this->GetBasePerspective();
+		FRotator Goal = this->PerspectiveCopyComponent->GetComponentRotation();
 
-	if (this->PerspectiveCopy != nullptr) {
+		if (this->InterpolationTime == 0.0f) {
+			return Goal;
+		}
+		else {
+
+			float Alpha = FMath::Min(this->CurrentInterpolation / this->InterpolationTime, 1.0);
+			return FMath::Lerp(Base, Goal, Alpha);
+		}		
+	}
+	else if (this->PerspectiveCopy != nullptr) {
 		FRotator Base = this->GetBasePerspective();
 		FRotator Goal = this->PerspectiveCopy->GetActorRotation();
 

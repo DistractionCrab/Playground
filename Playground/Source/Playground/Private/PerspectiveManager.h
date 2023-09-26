@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Components/SceneComponent.h"
 #include "PerspectiveManager.generated.h"
 
 
@@ -23,6 +24,9 @@ class UPerspectiveManager : public UActorComponent
 
 	UPROPERTY(EditAnywhere, Category = "Perspective Manager", meta = (AllowPrivateAccess = "true"))
 	class AActor* PerspectiveCopy;
+
+	UPROPERTY(EditAnywhere, Category = "Perspective Manager", meta = (AllowPrivateAccess = "true"))
+	class USceneComponent* PerspectiveCopyComponent;
 
 public:	
 	// Sets default values for this component's properties
@@ -46,13 +50,17 @@ public:
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "Perspective Manager")
+	void SetPerspectiveComponent(USceneComponent* PCopy) { 
+		this->PerspectiveCopyComponent = PCopy; 
+		this->CurrentInterpolation = 0;
+	}
+
+	UFUNCTION(BlueprintCallable, Category = "Perspective Manager")
 	void SetDefaultPerspective(AActor* PCopy) { this->DefaultPerspective = PCopy; }
 
 	UFUNCTION(BlueprintCallable, Category = "Perspective Manager")
-	void ResetPerspective() { this->PerspectiveCopy = nullptr; }
+	void ResetPerspective();
 
-	
-
-
-	bool IsBound() { return this->PerspectiveCopy != nullptr;  }
+	UFUNCTION(BlueprintCallable, Category = "Perspective Manager")
+	bool IsBound();
 };
