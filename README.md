@@ -1,5 +1,5 @@
 # Game Engine Playground
-This project is intended as both a large demonstration of implementations in Unreal 5 and Unity as well as a portfolio project showcasing what I am capable of in some game engines. 
+This is a work-in-progress project intended to be a portfolio of what I can do with Unreal Engine and Unity. This is a cross-disciplinary projects with me developing not only the code for a game, but as well as assets, engineering, design, feature implementation and art. This project has been in development for approximately three weeks at this point.
 
 # Completed:
 - Base Character State Machine design
