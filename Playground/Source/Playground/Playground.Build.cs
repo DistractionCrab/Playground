@@ -8,6 +8,28 @@ public class Playground : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "HeadMountedDisplay", "EnhancedInput" });
+		PublicIncludePaths.AddRange(
+			new string[] {
+				
+			});
+
+		PublicDependencyModuleNames.AddRange(new string[] { 
+			"Core", 
+			"CoreUObject", 
+			"Engine", 
+			"InputCore", 
+			"HeadMountedDisplay", 
+			"AnimGraph", 
+			"AnimGraphRuntime", 
+			"EnhancedInput",
+			"BlueprintGraph",});
+
+		PrivateDependencyModuleNames.AddRange(new string[] {
+			"UnrealEd",
+			"AnimGraph",
+			"AnimGraphRuntime",
+			"BlueprintGraph", 
+			"EnhancedInput",
+			"Engine"});
 	}
 }

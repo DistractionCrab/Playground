@@ -6,12 +6,18 @@
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
 #include "PerspectiveManager.h"
+#include "PlaygroundStatics.h"
 #include "Delegates/Delegate.h"
 #include "PlaygroundCharacter.generated.h"
 
-#define DEFAULT_WALK_SPEED 200.0f
-#define DEFAULT_RUN_SPEED 500.0f
+const float DEFAULT_WALK_SPEED = 200.0f;
+const float DEFAULT_CAST_WALK_SPEED = 50.0f;
+const float DEFAULT_RUN_SPEED = 500.0f;
+const float DEFAULT_CAST_TIME = 2.0f;
 
+/**
+ * Enum in charge of communicating the exact state the character is in.
+ */
 UENUM(BlueprintType)
 enum class EPlaygroundCharacterState : uint8 {
 	IDLE           UMETA(DisplayName = "Idle"),
@@ -21,7 +27,22 @@ enum class EPlaygroundCharacterState : uint8 {
 	SPELLCAST       UMETA(DisplayName = "SpellCasting"),
 };
 
+/**
+ * Enum defining what actions exist. These enumerate all possible actions regardless of state,
+ * and only states themselves can define what action can take place in each state. 
+ */
+UENUM(BlueprintType)
+enum class EPlaygroundCharacterActions : uint8 {
+	MOVE               UMETA(DisplayName = "Moving"),
+	LANTERNHOLD        UMETA(DisplayName = "Walking"),
+	SHIELDBLOCK        UMETA(DisplayName = "Shield Block"),
+	ATTACK             UMETA(DisplayName = "Attack"),
+	LOOKAT             UMETA(DisplayName = "Look At"),
+	NOSPELL            UMETA(DisplayName = "No Spell"), // Used when attempting to cast a spell, but cannot.
+};
+
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FStateChangeListener, EPlaygroundCharacterState, From, EPlaygroundCharacterState, To);
+DECLARE_DYNAMIC_DELEGATE_OneParam(FActionChangeListener, TSet<EPlaygroundCharacterActions>, Actions);
 
 
 class PlaygroundCharacterStateMachine {
@@ -29,6 +50,8 @@ public:
 	bool RunPressed = false;
 	float WalkingSpeed = DEFAULT_WALK_SPEED;
 	float RunningSpeed = DEFAULT_RUN_SPEED;
+	float CastWalkSpeed = DEFAULT_CAST_WALK_SPEED;
+	float CastTime = DEFAULT_CAST_TIME;
 	FVector2D InputAxis;
 	TArray<FStateChangeListener> Listeners;
 
@@ -67,6 +90,7 @@ public:
 		
 
 		virtual void ApplyMovement(APlaygroundCharacter* mc, FVector2D Input);
+		virtual float GetWalkingSpeed() { return this->Owner->WalkingSpeed; }
 	} WALKING;
 
 	class Running: public Walking {
@@ -74,6 +98,7 @@ public:
 		virtual PlaygroundCharacterState* Enter(APlaygroundCharacter* mc) override;
 		virtual PlaygroundCharacterState* RunUpdate(APlaygroundCharacter* mc) override;
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::RUNNING; }
+		virtual float GetWalkingSpeed() override { return this->Owner->RunningSpeed; }
 	} RUNNING;
 
 	class Airborne : public PlaygroundCharacterState {
@@ -82,9 +107,15 @@ public:
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::AIRBORNE; }
 	} AIRBORNE;
 
-	class Casting : public PlaygroundCharacterState {
-		virtual PlaygroundCharacterState* FinishCast(APlaygroundCharacter* mc) { return &this->Owner->IDLE; }
+	class Casting : public Walking {
+	public:
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::SPELLCAST; }
+		virtual PlaygroundCharacterState* FinishCast(APlaygroundCharacter* mc) override { return &this->Owner->IDLE; }		
+		virtual PlaygroundCharacterState* RunUpdate(APlaygroundCharacter* mc) override { return this; }
+		virtual PlaygroundCharacterState* AttemptJump(APlaygroundCharacter* mc) override { return this; }
+		virtual PlaygroundCharacterState* Enter(APlaygroundCharacter* mc) override;
+
+		virtual float GetWalkingSpeed() override { return this->Owner->CastWalkSpeed; }
 	} CASTING;
 
 	PlaygroundCharacterState* CurrentState;
@@ -258,11 +289,17 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent, Category = "PlaygroundCharacter")
 	void StartCast();
-
 	virtual void StartCast_Implementation();
 
-	FORCEINLINE PlaygroundCharacterStateMachine* GetMachine() { return &this->Machine; }
+	UFUNCTION(BlueprintPure, Category = "PlaygroundCharacter")
+	float GetCastTime() { return this->DefineCastTime(); }
 
+	UFUNCTION(BlueprintNativeEvent, Category = "PlaygroundCharacter")
+	float DefineCastTime();
+	virtual float DefineCastTime_Implementation();
+
+
+	FORCEINLINE PlaygroundCharacterStateMachine* GetMachine() { return &this->Machine; }
 	FORCEINLINE UPerspectiveManager* GetPerspective() { return this->PerspectiveManager; }
 };
 

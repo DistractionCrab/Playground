@@ -1,9 +1,11 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "PlaygroundCharacter.h"
+#include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -111,7 +113,6 @@ void APlaygroundCharacter::PostEditChangeProperty(struct FPropertyChangedEvent& 
 	if (e.Property != nullptr) {
 		if (e.Property->GetFName() == GET_MEMBER_NAME_CHECKED(APlaygroundCharacter, WalkingSpeed)) {
 			this->Machine.WalkingSpeed = this->WalkingSpeed;			
-			//UE_LOG(LogTemp, Warning, TEXT("--------- Change -----------"));
 		}
 		else if (e.Property->GetFName() == GET_MEMBER_NAME_CHECKED(APlaygroundCharacter, RunningSpeed)) {
 			this->Machine.RunningSpeed = this->RunningSpeed;
@@ -196,7 +197,12 @@ void APlaygroundCharacter::FinishCast() {
 }
 
 void APlaygroundCharacter::StartCast_Implementation() {
+	this->Machine.CastTime = this->GetCastTime();
 	this->Machine.AttemptCast(this);
+}
+
+float APlaygroundCharacter::DefineCastTime_Implementation() {
+	return DEFAULT_CAST_TIME;
 }
 
 // -------------------------- State Machine Idle State Implementation --------------------------
@@ -250,7 +256,7 @@ State* Machine::Walking::Enter(APlaygroundCharacter* mc) {
 		return &this->Owner->RUNNING;
 	}
 	else {
-		mc->GetCharacterMovement()->MaxWalkSpeed = this->Owner->WalkingSpeed;
+		mc->GetCharacterMovement()->MaxWalkSpeed = this->GetWalkingSpeed();
 		this->ApplyMovement(mc, this->Owner->InputAxis);
 		return this;
 	}	
@@ -282,7 +288,7 @@ void Machine::Walking::ApplyMovement(APlaygroundCharacter* mc, FVector2D Input) 
 
 State* Machine::Running::Enter(APlaygroundCharacter* mc) {
 	if (this->Owner->RunPressed) {
-		mc->GetCharacterMovement()->MaxWalkSpeed = this->Owner->RunningSpeed;
+		mc->GetCharacterMovement()->MaxWalkSpeed = this->GetWalkingSpeed();
 		this->ApplyMovement(mc, this->Owner->InputAxis);
 		return this;		
 	}
@@ -315,5 +321,11 @@ State* Machine::Airborne::Enter(APlaygroundCharacter* mc) {
 	if (!mc->GetCharacterMovement()->IsFalling()) {
 		mc->Jump();
 	}
+	return this;
+}
+
+// --------------------------- State Machine Casting State Implementation ------------------------
+State* Machine::Casting::Enter(APlaygroundCharacter* mc) {
+	mc->GetCharacterMovement()->MaxWalkSpeed = this->GetWalkingSpeed();
 	return this;
 }
