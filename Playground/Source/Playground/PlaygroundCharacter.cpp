@@ -40,6 +40,25 @@ void Machine::UpdateState(PlaygroundCharacterState* To, APlaygroundCharacter* mc
 	}
 }
 
+void Machine::AddAction(EPlaygroundCharacterActions Action, APlaygroundCharacter* mc) {
+	if (!this->CurrentActions.Contains(Action)) {
+		this->CurrentActions.Add(Action);
+		for (const FActionChangeListener& a : this->ActionListeners) {
+			a.ExecuteIfBound(Action, true);
+		}
+	}
+	
+}
+
+void Machine::RemoveAction(EPlaygroundCharacterActions Action, APlaygroundCharacter* mc) {
+	if (this->CurrentActions.Contains(Action)) {
+		this->CurrentActions.Remove(Action);
+		for (const FActionChangeListener& a : this->ActionListeners) {
+			a.ExecuteIfBound(Action, false);
+		}
+	}
+}
+
 
 //////////////////////////////////////////////////////////////////////////
 // APlaygroundCharacter
@@ -205,6 +224,8 @@ float APlaygroundCharacter::DefineCastTime_Implementation() {
 	return DEFAULT_CAST_TIME;
 }
 
+
+
 // -------------------------- State Machine Idle State Implementation --------------------------
 
 State* Machine::Idle::Step(APlaygroundCharacter* mc, float DeltaTime) {
@@ -327,5 +348,16 @@ State* Machine::Airborne::Enter(APlaygroundCharacter* mc) {
 // --------------------------- State Machine Casting State Implementation ------------------------
 State* Machine::Casting::Enter(APlaygroundCharacter* mc) {
 	mc->GetCharacterMovement()->MaxWalkSpeed = this->GetWalkingSpeed();
+	return this;
+}
+
+State* Machine::Casting::AttemptMove(APlaygroundCharacter* mc) {
+	this->Owner->AddAction(EPlaygroundCharacterActions::MOVE, mc);
+	this->ApplyMovement(mc, this->Owner->InputAxis);
+	return this;
+}
+
+State* Machine::Casting::StopMove(APlaygroundCharacter* mc) {
+	this->Owner->RemoveAction(EPlaygroundCharacterActions::MOVE, mc);
 	return this;
 }

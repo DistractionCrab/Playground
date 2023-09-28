@@ -42,7 +42,7 @@ enum class EPlaygroundCharacterActions : uint8 {
 };
 
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FStateChangeListener, EPlaygroundCharacterState, From, EPlaygroundCharacterState, To);
-DECLARE_DYNAMIC_DELEGATE_OneParam(FActionChangeListener, TSet<EPlaygroundCharacterActions>, Actions);
+DECLARE_DYNAMIC_DELEGATE_TwoParams(FActionChangeListener, EPlaygroundCharacterActions, Actions, bool, AddedQ);
 
 
 class PlaygroundCharacterStateMachine {
@@ -53,7 +53,9 @@ public:
 	float CastWalkSpeed = DEFAULT_CAST_WALK_SPEED;
 	float CastTime = DEFAULT_CAST_TIME;
 	FVector2D InputAxis;
+	TSet<EPlaygroundCharacterActions> CurrentActions;
 	TArray<FStateChangeListener> Listeners;
+	TArray<FActionChangeListener> ActionListeners;
 
 	class PlaygroundCharacterState {
 	public:
@@ -110,6 +112,9 @@ public:
 	class Casting : public Walking {
 	public:
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::SPELLCAST; }
+
+		virtual PlaygroundCharacterState* AttemptMove(APlaygroundCharacter* mc) override;
+		virtual PlaygroundCharacterState* StopMove(APlaygroundCharacter* mc) override;
 		virtual PlaygroundCharacterState* FinishCast(APlaygroundCharacter* mc) override { return &this->Owner->IDLE; }		
 		virtual PlaygroundCharacterState* RunUpdate(APlaygroundCharacter* mc) override { return this; }
 		virtual PlaygroundCharacterState* AttemptJump(APlaygroundCharacter* mc) override { return this; }
@@ -171,6 +176,8 @@ public:
 
 private:
 	void UpdateState(PlaygroundCharacterState* To, APlaygroundCharacter* mc);
+	void AddAction(EPlaygroundCharacterActions Action, APlaygroundCharacter* mc);
+	void RemoveAction(EPlaygroundCharacterActions Action, APlaygroundCharacter* mc);
 };
 
 
@@ -279,6 +286,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
 	virtual void StateListen(const FStateChangeListener& Del) {
 		this->Machine.Listeners.Add(Del);
+	}
+
+	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
+	virtual void ActionListen(const FActionChangeListener& Del) {
+		this->Machine.ActionListeners.Add(Del);
 	}
 
 	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
