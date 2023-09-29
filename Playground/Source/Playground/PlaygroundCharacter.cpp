@@ -40,6 +40,17 @@ void Machine::UpdateState(PlaygroundCharacterState* To, APlaygroundCharacter* mc
 	}
 }
 
+State* State::AttemptLook(APlaygroundCharacter* mc) {
+	if (mc->Controller != nullptr && !mc->GetPerspective()->IsBound())
+	{
+		// add yaw and pitch input to controller
+		mc->AddControllerYawInput(this->Owner->LookAxis.X);
+		mc->AddControllerPitchInput(this->Owner->LookAxis.Y);
+	}
+
+	return this;
+}
+
 void Machine::AddAction(EPlaygroundCharacterActions Action, APlaygroundCharacter* mc) {
 	if (!this->CurrentActions.Contains(Action)) {
 		this->CurrentActions.Add(Action);
@@ -201,14 +212,9 @@ void APlaygroundCharacter::Move(const FInputActionValue& Value)	{
 void APlaygroundCharacter::Look(const FInputActionValue& Value)
 {
 	// input is a Vector2D
-	FVector2D LookAxisVector = Value.Get<FVector2D>();
-
-	if (Controller != nullptr && !this->PerspectiveManager->IsBound())
-	{
-		// add yaw and pitch input to controller
-		AddControllerYawInput(LookAxisVector.X);
-		AddControllerPitchInput(LookAxisVector.Y);
-	}
+	this->Machine.LookAxis = Value.Get<FVector2D>();
+	this->Machine.AttemptLook(this);
+	
 }
 
 void APlaygroundCharacter::FinishCast() {
@@ -347,6 +353,7 @@ State* Machine::Airborne::Enter(APlaygroundCharacter* mc) {
 
 // --------------------------- State Machine Casting State Implementation ------------------------
 State* Machine::Casting::Enter(APlaygroundCharacter* mc) {
+
 	mc->GetCharacterMovement()->MaxWalkSpeed = this->GetWalkingSpeed();
 	return this;
 }

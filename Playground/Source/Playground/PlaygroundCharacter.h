@@ -53,6 +53,7 @@ public:
 	float CastWalkSpeed = DEFAULT_CAST_WALK_SPEED;
 	float CastTime = DEFAULT_CAST_TIME;
 	FVector2D InputAxis;
+	FVector2D LookAxis;
 	TSet<EPlaygroundCharacterActions> CurrentActions;
 	TArray<FStateChangeListener> Listeners;
 	TArray<FActionChangeListener> ActionListeners;
@@ -71,6 +72,7 @@ public:
 		virtual PlaygroundCharacterState* AttemptJump(APlaygroundCharacter* mc) { return this; }
 		virtual PlaygroundCharacterState* AttemptCast(APlaygroundCharacter* mc) { return this; }
 		virtual PlaygroundCharacterState* FinishCast(APlaygroundCharacter* mc) { return this; }
+		virtual PlaygroundCharacterState* AttemptLook(APlaygroundCharacter* mc);
 	};
 
 	class Idle: public PlaygroundCharacterState {
@@ -163,6 +165,7 @@ public:
 	void AttemptJump(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->AttemptJump(mc), mc); }
 	void AttemptCast(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->AttemptCast(mc), mc); }
 	void FinishCast(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->FinishCast(mc), mc); }
+	void AttemptLook(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->AttemptLook(mc), mc); }
 
 	void ForceState(EPlaygroundCharacterState e, APlaygroundCharacter* mc) {
 		switch (e) {
