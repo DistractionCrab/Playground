@@ -1,6 +1,10 @@
 # Game Engine Playground
 This is a work-in-progress project intended to be a portfolio of what I can do with Unreal Engine and Unity. This is a cross-disciplinary projects with me developing not only the code for a game, but as well as assets, engineering, design, feature implementation and art. This project has been in development for approximately three weeks at this point.
 
+## Progress Videos:
+
+- [Month 1](https://youtu.be/Bh_T2ypWLW0)
+
 # Engineering Design and Approach
 
 The approach for designing this "game" is an event based driven API system that focuses on exposing methods for registering
