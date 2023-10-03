@@ -70,6 +70,12 @@ void Machine::RemoveAction(EPlaygroundCharacterActions Action, APlaygroundCharac
 	}
 }
 
+void Machine::ClearActions(APlaygroundCharacter* mc) {
+	for (const EPlaygroundCharacterActions& a: this->CurrentActions) {
+		this->RemoveAction(a, mc);
+	}
+}
+
 
 //////////////////////////////////////////////////////////////////////////
 // APlaygroundCharacter
@@ -367,4 +373,8 @@ State* Machine::Casting::AttemptMove(APlaygroundCharacter* mc) {
 State* Machine::Casting::StopMove(APlaygroundCharacter* mc) {
 	this->Owner->RemoveAction(EPlaygroundCharacterActions::MOVE, mc);
 	return this;
+}
+
+void Machine::Casting::Exit(APlaygroundCharacter* mc) {
+	this->Owner->ClearActions(mc);
 }

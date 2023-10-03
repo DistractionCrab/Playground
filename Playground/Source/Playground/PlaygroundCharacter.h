@@ -121,6 +121,7 @@ public:
 		virtual PlaygroundCharacterState* RunUpdate(APlaygroundCharacter* mc) override { return this; }
 		virtual PlaygroundCharacterState* AttemptJump(APlaygroundCharacter* mc) override { return this; }
 		virtual PlaygroundCharacterState* Enter(APlaygroundCharacter* mc) override;
+		virtual void Exit(APlaygroundCharacter* mc) override;
 
 		virtual float GetWalkingSpeed() override { return this->Owner->CastWalkSpeed; }
 	} CASTING;
@@ -181,6 +182,7 @@ private:
 	void UpdateState(PlaygroundCharacterState* To, APlaygroundCharacter* mc);
 	void AddAction(EPlaygroundCharacterActions Action, APlaygroundCharacter* mc);
 	void RemoveAction(EPlaygroundCharacterActions Action, APlaygroundCharacter* mc);
+	void ClearActions(APlaygroundCharacter* mc);
 };
 
 
