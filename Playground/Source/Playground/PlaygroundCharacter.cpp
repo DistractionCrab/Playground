@@ -183,6 +183,9 @@ void APlaygroundCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 
 		// Spell Casting
 		EnhancedInputComponent->BindAction(SpellCastAction, ETriggerEvent::Started, this, &APlaygroundCharacter::SpellCastInput);
+
+		// Attacking
+		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &APlaygroundCharacter::AttackInput);
 	}
 
 }
@@ -210,6 +213,12 @@ void APlaygroundCharacter::SpellCastInput(const FInputActionValue& Value)
 {
 	this->StartCast();
 }
+
+void APlaygroundCharacter::AttackInput(const FInputActionValue& Value)
+{
+	this->StartAttack();
+}
+
 void APlaygroundCharacter::Move(const FInputActionValue& Value)	{	
 	this->Machine.InputAxis = Value.Get<FVector2D>();
 	this->Machine.AttemptMove(this);
@@ -237,6 +246,14 @@ float APlaygroundCharacter::DefineCastTime_Implementation() {
 }
 
 
+void APlaygroundCharacter::StartAttack_Implementation() {
+	this->Machine.AttemptAttack(this);
+}
+
+void APlaygroundCharacter::FinishAttack() {
+	this->Machine.FinishAttack(this);
+}
+
 
 // -------------------------- State Machine Idle State Implementation --------------------------
 
@@ -263,6 +280,10 @@ State* Machine::Idle::AttemptJump(APlaygroundCharacter* mc){
 	return &this->Owner->AIRBORNE;
 }
 
+State* Machine::Idle::AttemptAttack(APlaygroundCharacter* mc) {
+	return &this->Owner->ATTACKING;
+}
+
 // -------------------------- State Machine Walking State Implementation --------------------------
 
 State* Machine::Walking::AttemptMove(APlaygroundCharacter* mc) {
@@ -280,8 +301,13 @@ State* Machine::Walking::RunUpdate(APlaygroundCharacter* mc) {
 		return this;
 	}
 }
+
 State* Machine::Walking::AttemptJump(APlaygroundCharacter* mc){
 	return &this->Owner->AIRBORNE;
+}
+
+State* Machine::Walking::AttemptAttack(APlaygroundCharacter* mc) {
+	return &this->Owner->ATTACKING;
 }
 
 State* Machine::Walking::Enter(APlaygroundCharacter* mc) {
@@ -377,4 +403,10 @@ State* Machine::Casting::StopMove(APlaygroundCharacter* mc) {
 
 void Machine::Casting::Exit(APlaygroundCharacter* mc) {
 	this->Owner->ClearActions(mc);
+}
+
+// ------------------------- State Machine Attacking State Implementation ---------------------
+
+State* Machine::Attacking::FinishAttack(APlaygroundCharacter* mc) {
+	return &this->Owner->IDLE;
 }

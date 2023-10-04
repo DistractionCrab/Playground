@@ -24,8 +24,11 @@ enum class EPlaygroundCharacterState : uint8 {
 	WALKING        UMETA(DisplayName = "Walking"),
 	RUNNING        UMETA(DisplayName = "Running"),
 	AIRBORNE       UMETA(DisplayName = "Airborne"),
-	SPELLCAST       UMETA(DisplayName = "SpellCasting"),
+	SPELLCAST      UMETA(DisplayName = "SpellCasting"),
+	ATTACKING         UMETA(DisplayName = "Attacking"),
+	DEFLECTED         UMETA(DisplayName = "Deflected"),
 };
+
 
 /**
  * Enum defining what actions exist. These enumerate all possible actions regardless of state,
@@ -60,26 +63,39 @@ public:
 
 	class PlaygroundCharacterState {
 	public:
+		// Reference to owner state machine.
 		PlaygroundCharacterStateMachine* Owner;
-	public:
+
 		virtual EPlaygroundCharacterState GetState() { return EPlaygroundCharacterState::IDLE; }
 		virtual PlaygroundCharacterState* Enter(APlaygroundCharacter* mc) { return this; }
 		virtual void Exit(APlaygroundCharacter* mc) {}
 		virtual PlaygroundCharacterState* Step(APlaygroundCharacter* mc, float DeltaTime) { return this; }
+
+		// General Motion
 		virtual PlaygroundCharacterState* AttemptMove(APlaygroundCharacter* mc) { return this; }
 		virtual PlaygroundCharacterState* StopMove(APlaygroundCharacter* mc) { return this; }
 		virtual PlaygroundCharacterState* RunUpdate(APlaygroundCharacter* mc) { return this; }
 		virtual PlaygroundCharacterState* AttemptJump(APlaygroundCharacter* mc) { return this; }
-		virtual PlaygroundCharacterState* AttemptCast(APlaygroundCharacter* mc) { return this; }
-		virtual PlaygroundCharacterState* FinishCast(APlaygroundCharacter* mc) { return this; }
 		virtual PlaygroundCharacterState* AttemptLook(APlaygroundCharacter* mc);
+		// Spell Casting
+		virtual PlaygroundCharacterState* AttemptCast(APlaygroundCharacter* mc) { return this; }
+		virtual PlaygroundCharacterState* FinishCast(APlaygroundCharacter* mc) { return this; }		
+		// Attacking
+		virtual PlaygroundCharacterState* AttemptAttack(APlaygroundCharacter* mc) { return this; }
+		virtual PlaygroundCharacterState* FinishAttack(APlaygroundCharacter* mc) { return this; }
 	};
+
+	class Attacking : public PlaygroundCharacterState {
+		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::ATTACKING; }
+		virtual PlaygroundCharacterState* FinishAttack(APlaygroundCharacter* mc) override;
+	} ATTACKING;
 
 	class Idle: public PlaygroundCharacterState {
 		virtual PlaygroundCharacterState* Step(APlaygroundCharacter* mc, float DeltaTime) override;
 		virtual PlaygroundCharacterState* AttemptMove(APlaygroundCharacter* mc) override;
 		virtual PlaygroundCharacterState* AttemptJump(APlaygroundCharacter* mc) override;
 		virtual PlaygroundCharacterState* AttemptCast(APlaygroundCharacter* mc) override { return &this->Owner->CASTING; }
+		virtual PlaygroundCharacterState* AttemptAttack(APlaygroundCharacter* mc) override;
 	} IDLE;
 
 	class Walking: public PlaygroundCharacterState {
@@ -90,6 +106,9 @@ public:
 		virtual PlaygroundCharacterState* RunUpdate(APlaygroundCharacter* mc) override;
 		virtual PlaygroundCharacterState* AttemptJump(APlaygroundCharacter* mc) override;
 		virtual PlaygroundCharacterState* AttemptCast(APlaygroundCharacter* mc) override { return &this->Owner->CASTING; }
+		virtual PlaygroundCharacterState* AttemptAttack(APlaygroundCharacter* mc) override;
+
+
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::WALKING; }
 		
 
@@ -152,6 +171,7 @@ public:
 		this->RUNNING.Owner = this;
 		this->AIRBORNE.Owner = this;
 		this->CASTING.Owner = this;
+		this->ATTACKING.Owner = this;
 	}
 
 	void BeginPlay() {
@@ -159,6 +179,7 @@ public:
 			a.ExecuteIfBound(IDLE.GetState(), IDLE.GetState());
 		}
 	}
+
 	void Step(APlaygroundCharacter* mc, float DeltaTime) { this->UpdateState(this->CurrentState->Step(mc, DeltaTime), mc); }
 	void AttemptMove(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->AttemptMove(mc), mc); }
 	void StopMove(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->StopMove(mc), mc); }
@@ -166,6 +187,8 @@ public:
 	void AttemptJump(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->AttemptJump(mc), mc); }
 	void AttemptCast(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->AttemptCast(mc), mc); }
 	void FinishCast(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->FinishCast(mc), mc); }
+	void AttemptAttack(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->AttemptAttack(mc), mc); }
+	void FinishAttack(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->FinishAttack(mc), mc); }
 	void AttemptLook(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->AttemptLook(mc), mc); }
 
 	void ForceState(EPlaygroundCharacterState e, APlaygroundCharacter* mc) {
@@ -243,6 +266,10 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputAction* SpellCastAction;
 
+	/** Spell Cast Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	class UInputAction* AttackAction;
+
 public:
 	APlaygroundCharacter();
 	
@@ -269,8 +296,11 @@ protected:
 	/** Called for looking input */
 	virtual void JumpInput(const FInputActionValue& Value);
 
-	/** Called for looking input */
+	/** Called for spell cast input */
 	virtual void SpellCastInput(const FInputActionValue& Value);
+
+	/** Called for attack input */
+	virtual void AttackInput(const FInputActionValue& Value);
 
 protected:
 	// Called every frame
@@ -297,16 +327,18 @@ public:
 	virtual void ActionListen(const FActionChangeListener& Del) {
 		this->Machine.ActionListeners.Add(Del);
 	}
-
-	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
-	virtual void FinishCast();
+	
 
 	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
 	void ForceState(EPlaygroundCharacterState e) { this->Machine.ForceState(e, this); }
 
+
+	// ----------------------Functions for Spell Casting  -----------------------------
 	UFUNCTION(BlueprintNativeEvent, Category = "PlaygroundCharacter")
 	void StartCast();
 	virtual void StartCast_Implementation();
+	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
+	virtual void FinishCast();
 
 	UFUNCTION(BlueprintPure, Category = "PlaygroundCharacter")
 	float GetCastTime() { return this->DefineCastTime(); }
@@ -315,6 +347,13 @@ public:
 	float DefineCastTime();
 	virtual float DefineCastTime_Implementation();
 
+
+	// ----------------------Functions for Attacking  -----------------------------
+	UFUNCTION(BlueprintNativeEvent, Category = "PlaygroundCharacter")
+	void StartAttack();
+	virtual void StartAttack_Implementation();
+	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
+	virtual void FinishAttack();
 
 	FORCEINLINE PlaygroundCharacterStateMachine* GetMachine() { return &this->Machine; }
 	FORCEINLINE UPerspectiveManager* GetPerspective() { return this->PerspectiveManager; }
