@@ -25,8 +25,9 @@ enum class EPlaygroundCharacterState : uint8 {
 	RUNNING        UMETA(DisplayName = "Running"),
 	AIRBORNE       UMETA(DisplayName = "Airborne"),
 	SPELLCAST      UMETA(DisplayName = "SpellCasting"),
-	ATTACKING         UMETA(DisplayName = "Attacking"),
-	DEFLECTED         UMETA(DisplayName = "Deflected"),
+	ATTACKING      UMETA(DisplayName = "Attacking"),
+	DEFLECTING     UMETA(DisplayName = "Deflected"),
+	GUARDING       UMETA(DisplayName = "Guarding"),
 };
 
 
@@ -49,6 +50,9 @@ DECLARE_DYNAMIC_DELEGATE_TwoParams(FActionChangeListener, EPlaygroundCharacterAc
 
 
 class PlaygroundCharacterStateMachine {
+private:
+	APlaygroundCharacter* Actor;
+
 public:
 	bool RunPressed = false;
 	float WalkingSpeed = DEFAULT_WALK_SPEED;
@@ -67,66 +71,69 @@ public:
 		PlaygroundCharacterStateMachine* Owner;
 
 		virtual EPlaygroundCharacterState GetState() { return EPlaygroundCharacterState::IDLE; }
-		virtual PlaygroundCharacterState* Enter(APlaygroundCharacter* mc) { return this; }
-		virtual void Exit(APlaygroundCharacter* mc) {}
-		virtual PlaygroundCharacterState* Step(APlaygroundCharacter* mc, float DeltaTime) { return this; }
+		virtual PlaygroundCharacterState* Enter() { return this; }
+		virtual void Exit() {}
+		virtual PlaygroundCharacterState* Step(float DeltaTime) { return this; }
 
 		// General Motion
-		virtual PlaygroundCharacterState* AttemptMove(APlaygroundCharacter* mc) { return this; }
-		virtual PlaygroundCharacterState* StopMove(APlaygroundCharacter* mc) { return this; }
-		virtual PlaygroundCharacterState* RunUpdate(APlaygroundCharacter* mc) { return this; }
-		virtual PlaygroundCharacterState* AttemptJump(APlaygroundCharacter* mc) { return this; }
-		virtual PlaygroundCharacterState* AttemptLook(APlaygroundCharacter* mc);
+		virtual PlaygroundCharacterState* AttemptMove() { return this; }
+		virtual PlaygroundCharacterState* StopMove() { return this; }
+		virtual PlaygroundCharacterState* RunUpdate() { return this; }
+		virtual PlaygroundCharacterState* AttemptJump() { return this; }
+		virtual PlaygroundCharacterState* AttemptLook();
 		// Spell Casting
-		virtual PlaygroundCharacterState* AttemptCast(APlaygroundCharacter* mc) { return this; }
-		virtual PlaygroundCharacterState* FinishCast(APlaygroundCharacter* mc) { return this; }		
+		virtual PlaygroundCharacterState* AttemptCast() { return this; }
+		virtual PlaygroundCharacterState* FinishCast() { return this; }		
 		// Attacking
-		virtual PlaygroundCharacterState* AttemptAttack(APlaygroundCharacter* mc) { return this; }
-		virtual PlaygroundCharacterState* FinishAttack(APlaygroundCharacter* mc) { return this; }
+		virtual PlaygroundCharacterState* AttemptAttack() { return this; }
+		virtual PlaygroundCharacterState* FinishAttack() { return this; }
+		// Deflection
+		virtual PlaygroundCharacterState* AttemptDeflect() { return this; }
+		virtual PlaygroundCharacterState* FinishDeflect() { return this; }
+
+		FORCEINLINE APlaygroundCharacter* GetActor() { return this->Owner->Actor; }
+		FORCEINLINE PlaygroundCharacterStateMachine* GetOwner() { return this->Owner; }
 	};
 
-	class Attacking : public PlaygroundCharacterState {
-		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::ATTACKING; }
-		virtual PlaygroundCharacterState* FinishAttack(APlaygroundCharacter* mc) override;
-	} ATTACKING;
+	
 
 	class Idle: public PlaygroundCharacterState {
-		virtual PlaygroundCharacterState* Step(APlaygroundCharacter* mc, float DeltaTime) override;
-		virtual PlaygroundCharacterState* AttemptMove(APlaygroundCharacter* mc) override;
-		virtual PlaygroundCharacterState* AttemptJump(APlaygroundCharacter* mc) override;
-		virtual PlaygroundCharacterState* AttemptCast(APlaygroundCharacter* mc) override { return &this->Owner->CASTING; }
-		virtual PlaygroundCharacterState* AttemptAttack(APlaygroundCharacter* mc) override;
+		virtual PlaygroundCharacterState* Step(float DeltaTime) override;
+		virtual PlaygroundCharacterState* AttemptMove() override;
+		virtual PlaygroundCharacterState* AttemptJump() override;
+		virtual PlaygroundCharacterState* AttemptCast() override { return &this->Owner->CASTING; }
+		virtual PlaygroundCharacterState* AttemptAttack() override;
 	} IDLE;
 
 	class Walking: public PlaygroundCharacterState {
 	public:
-		virtual PlaygroundCharacterState* Enter(APlaygroundCharacter* mc) override;
-		virtual PlaygroundCharacterState* AttemptMove(APlaygroundCharacter* mc) override;
-		virtual PlaygroundCharacterState* StopMove(APlaygroundCharacter* mc) override;
-		virtual PlaygroundCharacterState* RunUpdate(APlaygroundCharacter* mc) override;
-		virtual PlaygroundCharacterState* AttemptJump(APlaygroundCharacter* mc) override;
-		virtual PlaygroundCharacterState* AttemptCast(APlaygroundCharacter* mc) override { return &this->Owner->CASTING; }
-		virtual PlaygroundCharacterState* AttemptAttack(APlaygroundCharacter* mc) override;
+		virtual PlaygroundCharacterState* Enter() override;
+		virtual PlaygroundCharacterState* AttemptMove() override;
+		virtual PlaygroundCharacterState* StopMove() override;
+		virtual PlaygroundCharacterState* RunUpdate() override;
+		virtual PlaygroundCharacterState* AttemptJump() override;
+		virtual PlaygroundCharacterState* AttemptCast() override { return &this->Owner->CASTING; }
+		virtual PlaygroundCharacterState* AttemptAttack() override;
 
 
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::WALKING; }
 		
 
-		virtual void ApplyMovement(APlaygroundCharacter* mc, FVector2D Input);
+		virtual void ApplyMovement();
 		virtual float GetWalkingSpeed() { return this->Owner->WalkingSpeed; }
 	} WALKING;
 
 	class Running: public Walking {
 	public:
-		virtual PlaygroundCharacterState* Enter(APlaygroundCharacter* mc) override;
-		virtual PlaygroundCharacterState* RunUpdate(APlaygroundCharacter* mc) override;
+		virtual PlaygroundCharacterState* Enter() override;
+		virtual PlaygroundCharacterState* RunUpdate() override;
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::RUNNING; }
 		virtual float GetWalkingSpeed() override { return this->Owner->RunningSpeed; }
 	} RUNNING;
 
 	class Airborne : public PlaygroundCharacterState {
-		virtual PlaygroundCharacterState* Step(APlaygroundCharacter* mc, float DeltaTime) override;
-		virtual PlaygroundCharacterState* Enter(APlaygroundCharacter* mc) override;
+		virtual PlaygroundCharacterState* Step(float DeltaTime) override;
+		virtual PlaygroundCharacterState* Enter() override;
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::AIRBORNE; }
 	} AIRBORNE;
 
@@ -134,16 +141,34 @@ public:
 	public:
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::SPELLCAST; }
 
-		virtual PlaygroundCharacterState* AttemptMove(APlaygroundCharacter* mc) override;
-		virtual PlaygroundCharacterState* StopMove(APlaygroundCharacter* mc) override;
-		virtual PlaygroundCharacterState* FinishCast(APlaygroundCharacter* mc) override { return &this->Owner->IDLE; }		
-		virtual PlaygroundCharacterState* RunUpdate(APlaygroundCharacter* mc) override { return this; }
-		virtual PlaygroundCharacterState* AttemptJump(APlaygroundCharacter* mc) override { return this; }
-		virtual PlaygroundCharacterState* Enter(APlaygroundCharacter* mc) override;
-		virtual void Exit(APlaygroundCharacter* mc) override;
+		virtual PlaygroundCharacterState* AttemptMove() override;
+		virtual PlaygroundCharacterState* StopMove() override;
+		virtual PlaygroundCharacterState* FinishCast() override { return &this->Owner->IDLE; }		
+		virtual PlaygroundCharacterState* RunUpdate() override { return this; }
+		virtual PlaygroundCharacterState* AttemptJump() override { return this; }
+		virtual PlaygroundCharacterState* Enter() override;
+		virtual void Exit() override;
 
 		virtual float GetWalkingSpeed() override { return this->Owner->CastWalkSpeed; }
 	} CASTING;
+
+	/* ------------------------------------ Combat Oriented States -------------------------------------- */
+	class Deflecting : public PlaygroundCharacterState {
+		bool CanChain = false;
+		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::DEFLECTING; }
+	} DEFLECTING;
+
+	class Attacking : public PlaygroundCharacterState {
+		bool CanChain = false;
+		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::ATTACKING; }
+		virtual PlaygroundCharacterState* FinishAttack() override;
+	} ATTACKING;
+
+	class Guarding : public Walking {
+		bool CanChain = false;
+		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::GUARDING; }
+		virtual float GetWalkingSpeed() override { return this->Owner->CastWalkSpeed; }
+	} GUARDING;
 
 	PlaygroundCharacterState* CurrentState;
 
@@ -164,6 +189,16 @@ private:
 	} TRANSITION;
 
 public:
+	PlaygroundCharacterStateMachine(APlaygroundCharacter* Parent): Actor(Parent) {
+		this->CurrentState = &IDLE;
+		this->IDLE.Owner = this;
+		this->WALKING.Owner = this;
+		this->RUNNING.Owner = this;
+		this->AIRBORNE.Owner = this;
+		this->CASTING.Owner = this;
+		this->ATTACKING.Owner = this;
+	}
+
 	PlaygroundCharacterStateMachine() {
 		this->CurrentState = &IDLE;
 		this->IDLE.Owner = this;
@@ -180,32 +215,32 @@ public:
 		}
 	}
 
-	void Step(APlaygroundCharacter* mc, float DeltaTime) { this->UpdateState(this->CurrentState->Step(mc, DeltaTime), mc); }
-	void AttemptMove(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->AttemptMove(mc), mc); }
-	void StopMove(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->StopMove(mc), mc); }
-	void RunUpdate(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->RunUpdate(mc), mc); }
-	void AttemptJump(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->AttemptJump(mc), mc); }
-	void AttemptCast(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->AttemptCast(mc), mc); }
-	void FinishCast(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->FinishCast(mc), mc); }
-	void AttemptAttack(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->AttemptAttack(mc), mc); }
-	void FinishAttack(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->FinishAttack(mc), mc); }
-	void AttemptLook(APlaygroundCharacter* mc) { this->UpdateState(this->CurrentState->AttemptLook(mc), mc); }
+	void Step(float DeltaTime) { this->UpdateState(this->CurrentState->Step(DeltaTime)); }
+	void AttemptMove() { this->UpdateState(this->CurrentState->AttemptMove()); }
+	void StopMove() { this->UpdateState(this->CurrentState->StopMove()); }
+	void RunUpdate() { this->UpdateState(this->CurrentState->RunUpdate()); }
+	void AttemptJump() { this->UpdateState(this->CurrentState->AttemptJump()); }
+	void AttemptCast() { this->UpdateState(this->CurrentState->AttemptCast()); }
+	void FinishCast() { this->UpdateState(this->CurrentState->FinishCast()); }
+	void AttemptAttack() { this->UpdateState(this->CurrentState->AttemptAttack()); }
+	void FinishAttack() { this->UpdateState(this->CurrentState->FinishAttack()); }
+	void AttemptLook() { this->UpdateState(this->CurrentState->AttemptLook()); }
 
-	void ForceState(EPlaygroundCharacterState e, APlaygroundCharacter* mc) {
+	void ForceState(EPlaygroundCharacterState e) {
 		switch (e) {
-			case EPlaygroundCharacterState::IDLE: this->UpdateState(&this->IDLE, mc); break;
-			case EPlaygroundCharacterState::WALKING: this->UpdateState(&this->WALKING, mc); break;
-			case EPlaygroundCharacterState::RUNNING: this->UpdateState(&this->RUNNING, mc); break;
-			case EPlaygroundCharacterState::AIRBORNE: this->UpdateState(&this->AIRBORNE, mc); break;
-			case EPlaygroundCharacterState::SPELLCAST: this->UpdateState(&this->CASTING, mc); break;
+			case EPlaygroundCharacterState::IDLE: this->UpdateState(&this->IDLE); break;
+			case EPlaygroundCharacterState::WALKING: this->UpdateState(&this->WALKING); break;
+			case EPlaygroundCharacterState::RUNNING: this->UpdateState(&this->RUNNING); break;
+			case EPlaygroundCharacterState::AIRBORNE: this->UpdateState(&this->AIRBORNE); break;
+			case EPlaygroundCharacterState::SPELLCAST: this->UpdateState(&this->CASTING); break;
 		}
 	}
 
 private:
-	void UpdateState(PlaygroundCharacterState* To, APlaygroundCharacter* mc);
-	void AddAction(EPlaygroundCharacterActions Action, APlaygroundCharacter* mc);
-	void RemoveAction(EPlaygroundCharacterActions Action, APlaygroundCharacter* mc);
-	void ClearActions(APlaygroundCharacter* mc);
+	void UpdateState(PlaygroundCharacterState* To);
+	void AddAction(EPlaygroundCharacterActions Action);
+	void RemoveAction(EPlaygroundCharacterActions Action);
+	void ClearActions();
 };
 
 
@@ -326,11 +361,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
 	virtual void ActionListen(const FActionChangeListener& Del) {
 		this->Machine.ActionListeners.Add(Del);
-	}
-	
+	}	
 
 	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
-	void ForceState(EPlaygroundCharacterState e) { this->Machine.ForceState(e, this); }
+	void ForceState(EPlaygroundCharacterState e) { this->Machine.ForceState(e); }
 
 
 	// ----------------------Functions for Spell Casting  -----------------------------
@@ -354,6 +388,12 @@ public:
 	virtual void StartAttack_Implementation();
 	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
 	virtual void FinishAttack();
+
+	UFUNCTION(BlueprintNativeEvent, Category = "PlaygroundCharacter")
+	void StartDeflect();
+	virtual void StartDeflect_Implementation();
+	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
+	virtual void FinishDeflect();
 
 	FORCEINLINE PlaygroundCharacterStateMachine* GetMachine() { return &this->Machine; }
 	FORCEINLINE UPerspectiveManager* GetPerspective() { return this->PerspectiveManager; }

@@ -17,12 +17,12 @@ typedef PlaygroundCharacterStateMachine::PlaygroundCharacterState State;
 
 // -------------------------------- State Machine ------------------------
 
-void Machine::UpdateState(PlaygroundCharacterState* To, APlaygroundCharacter* mc) {
+void Machine::UpdateState(PlaygroundCharacterState* To) {
 	int TID = this->TRANSITION.EnterTransition();
 	PlaygroundCharacterState* From = this->CurrentState;
 	if (From != To) {
-		From->Exit(mc);
-		auto Check = To->Enter(mc);
+		From->Exit();
+		auto Check = To->Enter();
 
 		if (Check == To) {
 			this->CurrentState = To;
@@ -34,24 +34,24 @@ void Machine::UpdateState(PlaygroundCharacterState* To, APlaygroundCharacter* mc
 			}				
 		}
 		else {
-			this->UpdateState(Check, mc);
+			this->UpdateState(Check);
 		}
 		
 	}
 }
 
-State* State::AttemptLook(APlaygroundCharacter* mc) {
-	if (mc->Controller != nullptr && !mc->GetPerspective()->IsBound())
+State* State::AttemptLook() {
+	if (this->GetActor()->Controller != nullptr && !GetActor()->GetPerspective()->IsBound())
 	{
 		// add yaw and pitch input to controller
-		mc->AddControllerYawInput(this->Owner->LookAxis.X);
-		mc->AddControllerPitchInput(this->Owner->LookAxis.Y);
+		this->GetActor()->AddControllerYawInput(this->Owner->LookAxis.X);
+		this->GetActor()->AddControllerPitchInput(this->Owner->LookAxis.Y);
 	}
 
 	return this;
 }
 
-void Machine::AddAction(EPlaygroundCharacterActions Action, APlaygroundCharacter* mc) {
+void Machine::AddAction(EPlaygroundCharacterActions Action) {
 	if (!this->CurrentActions.Contains(Action)) {
 		this->CurrentActions.Add(Action);
 		for (const FActionChangeListener& a : this->ActionListeners) {
@@ -61,7 +61,7 @@ void Machine::AddAction(EPlaygroundCharacterActions Action, APlaygroundCharacter
 	
 }
 
-void Machine::RemoveAction(EPlaygroundCharacterActions Action, APlaygroundCharacter* mc) {
+void Machine::RemoveAction(EPlaygroundCharacterActions Action) {
 	if (this->CurrentActions.Contains(Action)) {
 		this->CurrentActions.Remove(Action);
 		for (const FActionChangeListener& a : this->ActionListeners) {
@@ -70,9 +70,9 @@ void Machine::RemoveAction(EPlaygroundCharacterActions Action, APlaygroundCharac
 	}
 }
 
-void Machine::ClearActions(APlaygroundCharacter* mc) {
+void Machine::ClearActions() {
 	for (const EPlaygroundCharacterActions& a: this->CurrentActions) {
-		this->RemoveAction(a, mc);
+		this->RemoveAction(a);
 	}
 }
 
@@ -80,7 +80,7 @@ void Machine::ClearActions(APlaygroundCharacter* mc) {
 //////////////////////////////////////////////////////////////////////////
 // APlaygroundCharacter
 
-APlaygroundCharacter::APlaygroundCharacter()
+APlaygroundCharacter::APlaygroundCharacter() : Machine(this)
 {
 	PrimaryActorTick.bCanEverTick = true;
 	// Set size for collision capsule
@@ -139,7 +139,7 @@ void APlaygroundCharacter::BeginPlay()
 void APlaygroundCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	this->Machine.Step(this, DeltaTime);
+	this->Machine.Step(DeltaTime);
 }
 
 
@@ -191,21 +191,21 @@ void APlaygroundCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 }
 
 void APlaygroundCharacter::JumpInput(const FInputActionValue& Value) {
-	this->Machine.AttemptJump(this);
+	this->Machine.AttemptJump();
 }
 
 void APlaygroundCharacter::StopRunInput(const FInputActionValue& Value) {
 	this->Machine.RunPressed = false;
-	this->Machine.RunUpdate(this);
+	this->Machine.RunUpdate();
 }
 
 void APlaygroundCharacter::RunInput(const FInputActionValue& Value) {
 	this->Machine.RunPressed = true;
-	this->Machine.RunUpdate(this);
+	this->Machine.RunUpdate();
 }
 
 void APlaygroundCharacter::StopMove(const FInputActionValue& Value) {
-	this->Machine.StopMove(this);
+	this->Machine.StopMove();
 	//this->UpdateState(this->CurrentState->StopMove(this));
 }
 
@@ -221,24 +221,24 @@ void APlaygroundCharacter::AttackInput(const FInputActionValue& Value)
 
 void APlaygroundCharacter::Move(const FInputActionValue& Value)	{	
 	this->Machine.InputAxis = Value.Get<FVector2D>();
-	this->Machine.AttemptMove(this);
+	this->Machine.AttemptMove();
 }
 
 void APlaygroundCharacter::Look(const FInputActionValue& Value)
 {
 	// input is a Vector2D
 	this->Machine.LookAxis = Value.Get<FVector2D>();
-	this->Machine.AttemptLook(this);
+	this->Machine.AttemptLook();
 	
 }
 
 void APlaygroundCharacter::FinishCast() {
-	this->Machine.FinishCast(this); 
+	this->Machine.FinishCast(); 
 }
 
 void APlaygroundCharacter::StartCast_Implementation() {
 	this->Machine.CastTime = this->GetCastTime();
-	this->Machine.AttemptCast(this);
+	this->Machine.AttemptCast();
 }
 
 float APlaygroundCharacter::DefineCastTime_Implementation() {
@@ -247,18 +247,26 @@ float APlaygroundCharacter::DefineCastTime_Implementation() {
 
 
 void APlaygroundCharacter::StartAttack_Implementation() {
-	this->Machine.AttemptAttack(this);
+	this->Machine.AttemptAttack();
 }
 
 void APlaygroundCharacter::FinishAttack() {
-	this->Machine.FinishAttack(this);
+	this->Machine.FinishAttack();
 }
 
 
+void APlaygroundCharacter::StartDeflect_Implementation() {
+	
+}
+
+void APlaygroundCharacter::FinishDeflect() {
+	
+}
+
 // -------------------------- State Machine Idle State Implementation --------------------------
 
-State* Machine::Idle::Step(APlaygroundCharacter* mc, float DeltaTime) {
-	if (mc->GetCharacterMovement()->IsFalling()) {
+State* Machine::Idle::Step(float DeltaTime) {
+	if (GetActor()->GetCharacterMovement()->IsFalling()) {
 		return &this->Owner->AIRBORNE;
 	}
 	else {
@@ -266,7 +274,7 @@ State* Machine::Idle::Step(APlaygroundCharacter* mc, float DeltaTime) {
 	}
 }
 
-State* Machine::Idle::AttemptMove(APlaygroundCharacter* mc) {
+State* Machine::Idle::AttemptMove() {
 	if (this->Owner->RunPressed) {
 		return &this->Owner->RUNNING;
 	}
@@ -276,24 +284,24 @@ State* Machine::Idle::AttemptMove(APlaygroundCharacter* mc) {
 	
 }
 
-State* Machine::Idle::AttemptJump(APlaygroundCharacter* mc){
+State* Machine::Idle::AttemptJump(){
 	return &this->Owner->AIRBORNE;
 }
 
-State* Machine::Idle::AttemptAttack(APlaygroundCharacter* mc) {
+State* Machine::Idle::AttemptAttack() {
 	return &this->Owner->ATTACKING;
 }
 
 // -------------------------- State Machine Walking State Implementation --------------------------
 
-State* Machine::Walking::AttemptMove(APlaygroundCharacter* mc) {
-	this->ApplyMovement(mc, this->Owner->InputAxis);
+State* Machine::Walking::AttemptMove() {
+	this->ApplyMovement();
 	return this;
 }
-State* Machine::Walking::StopMove(APlaygroundCharacter* mc) {
+State* Machine::Walking::StopMove() {
 	return &this->Owner->IDLE;
 }
-State* Machine::Walking::RunUpdate(APlaygroundCharacter* mc) {
+State* Machine::Walking::RunUpdate() {
 	if (this->Owner->RunPressed) {
 		return &this->Owner->RUNNING;
 	}
@@ -302,33 +310,33 @@ State* Machine::Walking::RunUpdate(APlaygroundCharacter* mc) {
 	}
 }
 
-State* Machine::Walking::AttemptJump(APlaygroundCharacter* mc){
+State* Machine::Walking::AttemptJump(){
 	return &this->Owner->AIRBORNE;
 }
 
-State* Machine::Walking::AttemptAttack(APlaygroundCharacter* mc) {
+State* Machine::Walking::AttemptAttack() {
 	return &this->Owner->ATTACKING;
 }
 
-State* Machine::Walking::Enter(APlaygroundCharacter* mc) {
+State* Machine::Walking::Enter() {
 	if (this->Owner->RunPressed) {
 		return &this->Owner->RUNNING;
 	}
 	else {
-		mc->GetCharacterMovement()->MaxWalkSpeed = this->GetWalkingSpeed();
-		this->ApplyMovement(mc, this->Owner->InputAxis);
+		GetActor()->GetCharacterMovement()->MaxWalkSpeed = this->GetWalkingSpeed();
+		this->ApplyMovement();
 		return this;
 	}	
 }
 
-void Machine::Walking::ApplyMovement(APlaygroundCharacter* mc, FVector2D Input) {
+void Machine::Walking::ApplyMovement() {
 	FRotator Rotation;
 
-	auto Perspective = mc->GetPerspective();
+	auto Perspective = GetActor()->GetPerspective();
 	if (Perspective->IsBound()) {
 		Rotation = Perspective->GetPerspective();
 	} else {
-		Rotation = mc->Controller->GetControlRotation();
+		Rotation = GetActor()->Controller->GetControlRotation();
 	}
 	const FRotator YawRotation(0, Rotation.Yaw, 0);
 
@@ -339,16 +347,16 @@ void Machine::Walking::ApplyMovement(APlaygroundCharacter* mc, FVector2D Input) 
 	const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
 	// add movement 
-	mc->AddMovementInput(ForwardDirection, Input.Y);
-	mc->AddMovementInput(RightDirection, Input.X);
+	GetActor()->AddMovementInput(ForwardDirection, this->Owner->InputAxis.Y);
+	GetActor()->AddMovementInput(RightDirection, this->Owner->InputAxis.X);
 }
 
 // -------------------------- State Machine Running State Implementation --------------------------
 
-State* Machine::Running::Enter(APlaygroundCharacter* mc) {
+State* Machine::Running::Enter() {
 	if (this->Owner->RunPressed) {
-		mc->GetCharacterMovement()->MaxWalkSpeed = this->GetWalkingSpeed();
-		this->ApplyMovement(mc, this->Owner->InputAxis);
+		GetActor()->GetCharacterMovement()->MaxWalkSpeed = this->GetWalkingSpeed();
+		this->ApplyMovement();
 		return this;		
 	}
 	else {
@@ -357,7 +365,7 @@ State* Machine::Running::Enter(APlaygroundCharacter* mc) {
 }
 
 
-State* Machine::Running::RunUpdate(APlaygroundCharacter* mc) {
+State* Machine::Running::RunUpdate() {
 	if (this->Owner->RunPressed) {
 		return this;
 	}
@@ -368,45 +376,45 @@ State* Machine::Running::RunUpdate(APlaygroundCharacter* mc) {
 
 // -------------------------- State Machine Airborne State Implementation --------------------------
 
-State* Machine::Airborne::Step(APlaygroundCharacter* mc, float DeltaTime) {
-	if (mc->GetCharacterMovement()->IsFalling()) {
+State* Machine::Airborne::Step(float DeltaTime) {
+	if (GetActor()->GetCharacterMovement()->IsFalling()) {
 		return this;
 	}
 	else {
 		return &this->Owner->IDLE;
 	}
 }
-State* Machine::Airborne::Enter(APlaygroundCharacter* mc) {
-	if (!mc->GetCharacterMovement()->IsFalling()) {
-		mc->Jump();
+State* Machine::Airborne::Enter() {
+	if (!GetActor()->GetCharacterMovement()->IsFalling()) {
+		GetActor()->Jump();
 	}
 	return this;
 }
 
 // --------------------------- State Machine Casting State Implementation ------------------------
-State* Machine::Casting::Enter(APlaygroundCharacter* mc) {
+State* Machine::Casting::Enter() {
 
-	mc->GetCharacterMovement()->MaxWalkSpeed = this->GetWalkingSpeed();
+	GetActor()->GetCharacterMovement()->MaxWalkSpeed = this->GetWalkingSpeed();
 	return this;
 }
 
-State* Machine::Casting::AttemptMove(APlaygroundCharacter* mc) {
-	this->Owner->AddAction(EPlaygroundCharacterActions::MOVE, mc);
-	this->ApplyMovement(mc, this->Owner->InputAxis);
+State* Machine::Casting::AttemptMove() {
+	this->Owner->AddAction(EPlaygroundCharacterActions::MOVE);
+	this->ApplyMovement();
 	return this;
 }
 
-State* Machine::Casting::StopMove(APlaygroundCharacter* mc) {
-	this->Owner->RemoveAction(EPlaygroundCharacterActions::MOVE, mc);
+State* Machine::Casting::StopMove() {
+	this->Owner->RemoveAction(EPlaygroundCharacterActions::MOVE);
 	return this;
 }
 
-void Machine::Casting::Exit(APlaygroundCharacter* mc) {
-	this->Owner->ClearActions(mc);
+void Machine::Casting::Exit() {
+	this->Owner->ClearActions();
 }
 
 // ------------------------- State Machine Attacking State Implementation ---------------------
 
-State* Machine::Attacking::FinishAttack(APlaygroundCharacter* mc) {
+State* Machine::Attacking::FinishAttack() {
 	return &this->Owner->IDLE;
 }
