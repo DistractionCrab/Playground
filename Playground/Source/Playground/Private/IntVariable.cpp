@@ -17,7 +17,7 @@ UIntVariable::UIntVariable()
 // Called when the game starts
 void UIntVariable::BeginPlay()
 {
-
+	
 }
 
 
@@ -25,8 +25,7 @@ void UIntVariable::BeginPlay()
 void UIntVariable::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	
+	this->Value += this->TickAmount;
 }
 
 

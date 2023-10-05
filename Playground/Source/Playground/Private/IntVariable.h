@@ -43,6 +43,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Variables")
 	int Max = MAX_int32;
 
+	UPROPERTY(EditAnywhere, Category = "Variables")
+	int TickAmount = 0;
+
 public:	
 	// Sets default values for this component's properties
 	UIntVariable();
