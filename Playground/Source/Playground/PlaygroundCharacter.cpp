@@ -76,6 +76,10 @@ void Machine::ClearActions() {
 	}
 }
 
+void Machine::DeflectionEvent(bool AgainstPlayer) {
+	this->CurrentState->DeflectionEvent(AgainstPlayer);
+}
+
 
 //////////////////////////////////////////////////////////////////////////
 // APlaygroundCharacter
@@ -186,6 +190,9 @@ void APlaygroundCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 
 		// Attacking
 		EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &APlaygroundCharacter::AttackInput);
+		EnhancedInputComponent->BindAction(GuardAction, ETriggerEvent::Started, this, &APlaygroundCharacter::GuardInput);
+		EnhancedInputComponent->BindAction(GuardAction, ETriggerEvent::Completed, this, &APlaygroundCharacter::GuardRelease);
+		EnhancedInputComponent->BindAction(GuardAction, ETriggerEvent::Canceled, this, &APlaygroundCharacter::GuardRelease);
 	}
 
 }
@@ -217,6 +224,17 @@ void APlaygroundCharacter::SpellCastInput(const FInputActionValue& Value)
 void APlaygroundCharacter::AttackInput(const FInputActionValue& Value)
 {
 	this->StartAttack();
+}
+
+void APlaygroundCharacter::GuardInput(const FInputActionValue& Value)
+{
+	this->Machine.GuardPressed = true;
+	this->StartGuard();
+}
+
+void APlaygroundCharacter::GuardRelease(const FInputActionValue& Value) {
+	this->Machine.GuardPressed = false;
+	this->FinishGuard();
 }
 
 void APlaygroundCharacter::Move(const FInputActionValue& Value)	{	
@@ -254,13 +272,17 @@ void APlaygroundCharacter::FinishAttack() {
 	this->Machine.FinishAttack();
 }
 
-
-void APlaygroundCharacter::StartDeflect_Implementation() {
-	
+void APlaygroundCharacter::StartGuard_Implementation() {
+	this->Machine.AttemptGuard();
 }
 
-void APlaygroundCharacter::FinishDeflect() {
+void APlaygroundCharacter::FinishGuard_Implementation() {
+	this->Machine.FinishGuard();
+}
+
+void APlaygroundCharacter::StartDeflection_Implementation(bool AgainstPlayer) {
 	
+    this->Machine.DeflectionEvent(AgainstPlayer);
 }
 
 // -------------------------- State Machine Idle State Implementation --------------------------
@@ -289,6 +311,15 @@ State* Machine::Idle::AttemptJump(){
 }
 
 State* Machine::Idle::AttemptAttack() {
+	this->Owner->ClearActions();
+	this->Owner->AddAction(EPlaygroundCharacterActions::ATTACK);
+	return &this->Owner->ATTACKING;
+}
+
+State* Machine::Idle::AttemptGuard() {
+
+	this->Owner->ClearActions();
+	this->Owner->AddAction(EPlaygroundCharacterActions::SHIELDBLOCK);
 	return &this->Owner->ATTACKING;
 }
 
@@ -315,6 +346,12 @@ State* Machine::Walking::AttemptJump(){
 }
 
 State* Machine::Walking::AttemptAttack() {
+	this->Owner->AddAction(EPlaygroundCharacterActions::ATTACK);
+	return &this->Owner->ATTACKING;
+}
+
+State* Machine::Walking::AttemptGuard() {
+	this->Owner->AddAction(EPlaygroundCharacterActions::SHIELDBLOCK);
 	return &this->Owner->ATTACKING;
 }
 
@@ -415,6 +452,82 @@ void Machine::Casting::Exit() {
 
 // ------------------------- State Machine Attacking State Implementation ---------------------
 
+State* Machine::Attacking::AttemptAttack() {
+	if (this->ChainCondition()) {
+		this->Owner->RemoveAction(EPlaygroundCharacterActions::DEFLECTING);
+		this->Owner->RemoveAction(EPlaygroundCharacterActions::SHIELDBLOCK);
+		this->Owner->AddAction(EPlaygroundCharacterActions::ATTACK);
+		this->CanChain = false;
+	}
+	return this;
+}
+
 State* Machine::Attacking::FinishAttack() {
-	return &this->Owner->IDLE;
+	this->Owner->ClearActions();
+	if (this->Owner->GuardPressed) {
+		this->Owner->AddAction(EPlaygroundCharacterActions::SHIELDBLOCK);
+		return this;
+	} else {
+		return &this->Owner->IDLE;	
+	}	
+}
+
+State* Machine::Attacking::AttemptGuard() {
+	if (this->ChainCondition()) {
+		this->Owner->RemoveAction(EPlaygroundCharacterActions::DEFLECTING);
+		this->Owner->RemoveAction(EPlaygroundCharacterActions::ATTACK);
+		this->Owner->AddAction(EPlaygroundCharacterActions::SHIELDBLOCK);
+		this->CanChain = false;
+		return this;
+	}
+	return this;
+}
+
+State* Machine::Attacking::FinishGuard() {
+	if (this->Owner->CurrentActions.Contains(EPlaygroundCharacterActions::SHIELDBLOCK)) {
+		this->Owner->ClearActions();
+		return &this->Owner->IDLE;
+	} else {
+		return this;
+	}	
+}
+
+
+State* Machine::Attacking::AttemptMove() {
+	if (this->Owner->CurrentActions.Contains(EPlaygroundCharacterActions::SHIELDBLOCK)) {
+		this->Owner->AddAction(EPlaygroundCharacterActions::MOVE);
+		this->ApplyMovement();
+	} else if (this->Owner->CurrentActions.IsEmpty()) {
+		return &this->Owner->WALKING;
+	}
+	
+	return this;
+}
+
+State* Machine::Attacking::StopMove() {
+	this->Owner->RemoveAction(EPlaygroundCharacterActions::MOVE);
+	return this;
+}
+
+
+bool Machine::Attacking::ChainCondition() {
+	if (this->Owner->CurrentActions.Contains(EPlaygroundCharacterActions::SHIELDBLOCK)) {
+		return true;
+	} else {
+		return this->CanChain;
+	}
+}
+
+State* Machine::Attacking::DeflectionEvent(bool AgainstPlayer) {
+	if(GEngine)
+		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Deflection Setup!!"));
+	this->Owner->RemoveAction(EPlaygroundCharacterActions::SHIELDBLOCK);
+	this->Owner->RemoveAction(EPlaygroundCharacterActions::ATTACK);
+	this->Owner->RemoveAction(EPlaygroundCharacterActions::MOVE);
+	this->Owner->AddAction(EPlaygroundCharacterActions::DEFLECTING);
+	return this;
+}
+
+State* Machine::Attacking::RunUpdate() {
+	return this;
 }

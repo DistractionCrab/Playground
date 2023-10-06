@@ -42,11 +42,13 @@ enum class EPlaygroundCharacterActions : uint8 {
 	SHIELDBLOCK        UMETA(DisplayName = "Shield Block"),
 	ATTACK             UMETA(DisplayName = "Attack"),
 	LOOKAT             UMETA(DisplayName = "Look At"),
+	DEFLECTING         UMETA(DisplayName = "Deflecting"),
 	NOSPELL            UMETA(DisplayName = "No Spell"), // Used when attempting to cast a spell, but cannot.
 };
 
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FStateChangeListener, EPlaygroundCharacterState, From, EPlaygroundCharacterState, To);
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FActionChangeListener, EPlaygroundCharacterActions, Actions, bool, AddedQ);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FAttackEventListener);
 
 
 class PlaygroundCharacterStateMachine {
@@ -55,6 +57,7 @@ private:
 
 public:
 	bool RunPressed = false;
+	bool GuardPressed = false;
 	float WalkingSpeed = DEFAULT_WALK_SPEED;
 	float RunningSpeed = DEFAULT_RUN_SPEED;
 	float CastWalkSpeed = DEFAULT_CAST_WALK_SPEED;
@@ -88,8 +91,10 @@ public:
 		virtual PlaygroundCharacterState* AttemptAttack() { return this; }
 		virtual PlaygroundCharacterState* FinishAttack() { return this; }
 		// Deflection
-		virtual PlaygroundCharacterState* AttemptDeflect() { return this; }
-		virtual PlaygroundCharacterState* FinishDeflect() { return this; }
+		virtual PlaygroundCharacterState* AttemptGuard() { return this; }
+		virtual PlaygroundCharacterState* FinishGuard() { return this; }
+		virtual void ComboChainEvent() {}
+		virtual PlaygroundCharacterState* DeflectionEvent(bool AgainstPlayer) { return this; }
 
 		FORCEINLINE APlaygroundCharacter* GetActor() { return this->Owner->Actor; }
 		FORCEINLINE PlaygroundCharacterStateMachine* GetOwner() { return this->Owner; }
@@ -103,6 +108,7 @@ public:
 		virtual PlaygroundCharacterState* AttemptJump() override;
 		virtual PlaygroundCharacterState* AttemptCast() override { return &this->Owner->CASTING; }
 		virtual PlaygroundCharacterState* AttemptAttack() override;
+		virtual PlaygroundCharacterState* AttemptGuard() override;
 	} IDLE;
 
 	class Walking: public PlaygroundCharacterState {
@@ -114,6 +120,7 @@ public:
 		virtual PlaygroundCharacterState* AttemptJump() override;
 		virtual PlaygroundCharacterState* AttemptCast() override { return &this->Owner->CASTING; }
 		virtual PlaygroundCharacterState* AttemptAttack() override;
+		virtual PlaygroundCharacterState* AttemptGuard() override;
 
 
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::WALKING; }
@@ -153,22 +160,25 @@ public:
 	} CASTING;
 
 	/* ------------------------------------ Combat Oriented States -------------------------------------- */
-	class Deflecting : public PlaygroundCharacterState {
-		bool CanChain = false;
-		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::DEFLECTING; }
-	} DEFLECTING;
 
-	class Attacking : public PlaygroundCharacterState {
+	class Attacking : public Walking {
 		bool CanChain = false;
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::ATTACKING; }
+		virtual PlaygroundCharacterState* RunUpdate() override;
+		virtual PlaygroundCharacterState* AttemptMove() override;
+		virtual PlaygroundCharacterState* StopMove() override;
+		virtual PlaygroundCharacterState* AttemptAttack() override;
 		virtual PlaygroundCharacterState* FinishAttack() override;
+		// Deflection
+		virtual PlaygroundCharacterState* AttemptGuard() override;
+		virtual PlaygroundCharacterState* FinishGuard() override;
+		virtual void ComboChainEvent() override { this->CanChain = true; }
+		virtual PlaygroundCharacterState* DeflectionEvent(bool AgainstPlayer) override;
+		virtual float GetWalkingSpeed() override { return this->Owner->CastWalkSpeed; }
+
+		virtual bool ChainCondition();
 	} ATTACKING;
 
-	class Guarding : public Walking {
-		bool CanChain = false;
-		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::GUARDING; }
-		virtual float GetWalkingSpeed() override { return this->Owner->CastWalkSpeed; }
-	} GUARDING;
 
 	PlaygroundCharacterState* CurrentState;
 
@@ -224,7 +234,10 @@ public:
 	void FinishCast() { this->UpdateState(this->CurrentState->FinishCast()); }
 	void AttemptAttack() { this->UpdateState(this->CurrentState->AttemptAttack()); }
 	void FinishAttack() { this->UpdateState(this->CurrentState->FinishAttack()); }
+	void AttemptGuard() { this->UpdateState(this->CurrentState->AttemptGuard()); }
+	void FinishGuard() { this->UpdateState(this->CurrentState->FinishGuard()); }
 	void AttemptLook() { this->UpdateState(this->CurrentState->AttemptLook()); }
+	void DeflectionEvent(bool AgainstPlayer);
 
 	void ForceState(EPlaygroundCharacterState e) {
 		switch (e) {
@@ -264,6 +277,9 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character Physics",
 		meta = (AllowPrivateAccess = "true"))
 	float RunningSpeed = DEFAULT_RUN_SPEED;
+
+	UPROPERTY(BlueprintAssignable, Category = "PlaygroundCharacter", meta = (AllowPrivateAccess = "true"))
+	FAttackEventListener AttackEvent;
 
 	/** Camera boom positioning the camera behind the character */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -305,6 +321,10 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputAction* AttackAction;
 
+	/** Spell Cast Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	class UInputAction* GuardAction;
+
 public:
 	APlaygroundCharacter();
 	
@@ -336,6 +356,10 @@ protected:
 
 	/** Called for attack input */
 	virtual void AttackInput(const FInputActionValue& Value);
+
+	/** Called for attack input */
+	virtual void GuardInput(const FInputActionValue& Value);
+	virtual void GuardRelease(const FInputActionValue& Value);
 
 protected:
 	// Called every frame
@@ -390,10 +414,17 @@ public:
 	virtual void FinishAttack();
 
 	UFUNCTION(BlueprintNativeEvent, Category = "PlaygroundCharacter")
-	void StartDeflect();
-	virtual void StartDeflect_Implementation();
-	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
-	virtual void FinishDeflect();
+	void StartGuard();
+	virtual void StartGuard_Implementation();
+	UFUNCTION(BlueprintNativeEvent, Category = "PlaygroundCharacter")
+	void FinishGuard();
+	virtual void FinishGuard_Implementation();
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "PlaygroundCharacter")
+	void StartDeflection(bool AgainstPlayer);
+	virtual void StartDeflection_Implementation(bool AgainstPlayer);
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "PlaygroundCharacter")
+	void AttackRecovery();
+	virtual void AttackRecovery_Implementation();
 
 	FORCEINLINE PlaygroundCharacterStateMachine* GetMachine() { return &this->Machine; }
 	FORCEINLINE UPerspectiveManager* GetPerspective() { return this->PerspectiveManager; }
