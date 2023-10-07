@@ -5,6 +5,32 @@ This is a work-in-progress project intended to be a portfolio of what I can do w
 
 - [Month 1](https://youtu.be/Bh_T2ypWLW0)
 
+
+# General Completed TAsks:
+- Base Character State Machine design
+- Dynamical realistic water materials.
+- Dynamic perspective API
+- Interactive objects system and API
+- Chasing AI
+- Simple general Spellcasting System
+- Faction System
+- Spell Casting System
+
+
+# Started
+- Melee Combo System (2 chain combos done, blender animations need work).
+- Main UI for inventory, stats, and spells.
+- Village/Town design
+- Character attack animation system.
+- Develop dynamical grass system based off of Ghost of Tsushima's bezier approach.
+- - Does animate, need to work on parameterizations for individual blades.
+
+# Tasks
+- Develop custom gravitational orientations for walking on walls.
+- Make the chasing AI attack in various ways.
+- Object Pooling system for projectiles
+- Update BTT to better manage patrol point index: Current increments the index regardless of success. Not a big problem, but does cause some oddities when noticing the player
+
 # Engineering Design and Approach
 
 The approach for designing this "game" is an event based driven API system that focuses on exposing methods for registering
@@ -32,26 +58,3 @@ Part of this project is also to demonstrate my ability to design levels and envi
 primary map to walk through, but you can search through what I've started by downloading this project and going to the Main level.
 
 
-# General Completed TAsks:
-- Base Character State Machine design
-- Dynamical realistic water materials.
-- Dynamic perspective API
-- Interactive objects system and API
-- Chasing AI
-- Simple general Spellcasting System
-- Faction System
-- Spell Casting System
-
-
-# Started
-- Main UI for inventory, stats, and spells.
-- Village/Town design
-- Character attack animation system.
-- Develop dynamical grass system based off of Ghost of Tsushima's bezier approach.
-- - Does animate, need to work on parameterizations for individual blades.
-
-# Tasks
-- Develop custom gravitational orientations for walking on walls.
-- Make the chasing AI attack in various ways.
-- Object Pooling system for projectiles
-- Update BTT to better manage patrol point index: Current increments the index regardless of success. Not a big problem, but does cause some oddities when noticing the player
