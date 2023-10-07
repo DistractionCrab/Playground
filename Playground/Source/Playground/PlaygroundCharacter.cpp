@@ -282,7 +282,16 @@ void APlaygroundCharacter::FinishGuard_Implementation() {
 
 void APlaygroundCharacter::StartDeflection_Implementation(bool AgainstPlayer) {
 	
-    this->Machine.DeflectionEvent(AgainstPlayer);
+	this->Machine.DeflectionEvent(AgainstPlayer);
+}
+
+void APlaygroundCharacter::AttackRecovery_Implementation() {
+	
+    this->Machine.AttackRecovery();
+}
+
+void APlaygroundCharacter::ConsumeAttack() {
+	this->Machine.ConsumeAttack();
 }
 
 // -------------------------- State Machine Idle State Implementation --------------------------
@@ -473,6 +482,7 @@ State* Machine::Attacking::FinishAttack() {
 }
 
 State* Machine::Attacking::AttemptGuard() {
+
 	if (this->ChainCondition()) {
 		this->Owner->RemoveAction(EPlaygroundCharacterActions::DEFLECTING);
 		this->Owner->RemoveAction(EPlaygroundCharacterActions::ATTACK);
@@ -519,8 +529,7 @@ bool Machine::Attacking::ChainCondition() {
 }
 
 State* Machine::Attacking::DeflectionEvent(bool AgainstPlayer) {
-	if(GEngine)
-		GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("Deflection Setup!!"));
+	
 	this->Owner->RemoveAction(EPlaygroundCharacterActions::SHIELDBLOCK);
 	this->Owner->RemoveAction(EPlaygroundCharacterActions::ATTACK);
 	this->Owner->RemoveAction(EPlaygroundCharacterActions::MOVE);
@@ -530,4 +539,21 @@ State* Machine::Attacking::DeflectionEvent(bool AgainstPlayer) {
 
 State* Machine::Attacking::RunUpdate() {
 	return this;
+}
+
+State* Machine::Attacking::Enter() {
+	GetActor()->GetCharacterMovement()->MaxWalkSpeed = this->GetWalkingSpeed();
+	return this;
+}
+
+float Machine::Attacking::GetWalkingSpeed() { 
+	return this->Owner->CastWalkSpeed; 
+}
+
+void Machine::Attacking::AttackRecovery() { 
+	this->CanChain = true;
+	
+	if (this->Owner->GuardPressed) {
+		this->AttemptGuard();
+	}	
 }

@@ -93,7 +93,7 @@ public:
 		// Deflection
 		virtual PlaygroundCharacterState* AttemptGuard() { return this; }
 		virtual PlaygroundCharacterState* FinishGuard() { return this; }
-		virtual void ComboChainEvent() {}
+		virtual void AttackRecovery() {}
 		virtual PlaygroundCharacterState* DeflectionEvent(bool AgainstPlayer) { return this; }
 
 		FORCEINLINE APlaygroundCharacter* GetActor() { return this->Owner->Actor; }
@@ -164,6 +164,7 @@ public:
 	class Attacking : public Walking {
 		bool CanChain = false;
 		virtual EPlaygroundCharacterState GetState() override { return EPlaygroundCharacterState::ATTACKING; }
+		virtual PlaygroundCharacterState* Enter() override;
 		virtual PlaygroundCharacterState* RunUpdate() override;
 		virtual PlaygroundCharacterState* AttemptMove() override;
 		virtual PlaygroundCharacterState* StopMove() override;
@@ -172,9 +173,9 @@ public:
 		// Deflection
 		virtual PlaygroundCharacterState* AttemptGuard() override;
 		virtual PlaygroundCharacterState* FinishGuard() override;
-		virtual void ComboChainEvent() override { this->CanChain = true; }
+		virtual void AttackRecovery() override;
 		virtual PlaygroundCharacterState* DeflectionEvent(bool AgainstPlayer) override;
-		virtual float GetWalkingSpeed() override { return this->Owner->CastWalkSpeed; }
+		virtual float GetWalkingSpeed() override;
 
 		virtual bool ChainCondition();
 	} ATTACKING;
@@ -238,6 +239,8 @@ public:
 	void FinishGuard() { this->UpdateState(this->CurrentState->FinishGuard()); }
 	void AttemptLook() { this->UpdateState(this->CurrentState->AttemptLook()); }
 	void DeflectionEvent(bool AgainstPlayer);
+	void AttackRecovery() { this->CurrentState->AttackRecovery(); }
+	void ConsumeAttack() { this->RemoveAction(EPlaygroundCharacterActions::ATTACK); }
 
 	void ForceState(EPlaygroundCharacterState e) {
 		switch (e) {
@@ -419,12 +422,15 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "PlaygroundCharacter")
 	void FinishGuard();
 	virtual void FinishGuard_Implementation();
+
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "PlaygroundCharacter")
 	void StartDeflection(bool AgainstPlayer);
 	virtual void StartDeflection_Implementation(bool AgainstPlayer);
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "PlaygroundCharacter")
 	void AttackRecovery();
 	virtual void AttackRecovery_Implementation();
+	UFUNCTION(BlueprintCallable, Category = "PlaygroundCharacter")
+	virtual void ConsumeAttack();
 
 	FORCEINLINE PlaygroundCharacterStateMachine* GetMachine() { return &this->Machine; }
 	FORCEINLINE UPerspectiveManager* GetPerspective() { return this->PerspectiveManager; }
