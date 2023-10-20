@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
-#include "PerspectiveManager.h"
+#include "Components/PerspectiveManager.h"
 #include "PlaygroundStatics.h"
 #include "Delegates/Delegate.h"
 #include "PlaygroundCharacter.generated.h"

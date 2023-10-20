@@ -6,12 +6,7 @@ public class Playground : ModuleRules
 {
 	public Playground(ReadOnlyTargetRules Target) : base(Target)
 	{
-		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-
-		PublicIncludePaths.AddRange(
-			new string[] {
-				
-			});
+		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;		
 
 		PublicDependencyModuleNames.AddRange(new string[] { 
 			"Core", 
@@ -22,7 +17,8 @@ public class Playground : ModuleRules
 			"AnimGraph", 
 			"AnimGraphRuntime", 
 			"EnhancedInput",
-			"BlueprintGraph",});
+			"BlueprintGraph",
+			"CrabToolsUE5",});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
 			"UnrealEd",
@@ -30,6 +26,16 @@ public class Playground : ModuleRules
 			"AnimGraphRuntime",
 			"BlueprintGraph", 
 			"EnhancedInput",
-			"Engine"});
+			"Engine",
+			"CrabToolsUE5",});
+
+		PrivateIncludePathModuleNames.AddRange(new string[] {
+			"CrabToolsUE5",
+		});
+
+		PublicIncludePaths.AddRange(
+			new string[] {
+				"CrabToolsUE5/Public",
+			});
 	}
 }
