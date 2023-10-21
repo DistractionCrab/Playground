@@ -14,17 +14,11 @@ public class Playground : ModuleRules
 			"Engine", 
 			"InputCore", 
 			"HeadMountedDisplay", 
-			"AnimGraph", 
-			"AnimGraphRuntime", 
 			"EnhancedInput",
-			"BlueprintGraph",
 			"CrabToolsUE5",});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
 			"UnrealEd",
-			"AnimGraph",
-			"AnimGraphRuntime",
-			"BlueprintGraph", 
 			"EnhancedInput",
 			"Engine",
 			"CrabToolsUE5",});
@@ -33,9 +27,11 @@ public class Playground : ModuleRules
 			"CrabToolsUE5",
 		});
 
+		/*
 		PublicIncludePaths.AddRange(
 			new string[] {
 				"CrabToolsUE5/Public",
 			});
+		*/
 	}
 }
