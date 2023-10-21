@@ -1,6 +1,10 @@
 # Game Engine Playground
 This is a work-in-progress project intended to be a portfolio of what I can do with Unreal Engine and Unity. This is a cross-disciplinary projects with me developing not only the code for a game, but as well as assets, engineering, design, feature implementation and art. This project has been in development for approximately three weeks at this point.
 
+Part of this project has been split into various plugins to improve development across this testbed/portfolio and more concrete projects I am working. Here is a list of plugins available:
+
+- [General Tools](https://github.com/DistractionCrab/CrabToolsUE5/)
+
 ## Progress Videos:
 
 - [Month 1](https://youtu.be/Bh_T2ypWLW0)
