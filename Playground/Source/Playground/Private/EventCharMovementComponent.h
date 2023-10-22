@@ -23,6 +23,7 @@ class UEventCharMovementComponent : public UCharacterMovementComponent
 
 protected:	
 	virtual void OnMovementModeChanged(EMovementMode Previous, uint8 PreviousCustom) override;
+	virtual void OnMovementUpdated(float DeltaSeconds, const FVector& OldLocation, const FVector& OldVelocity) override;
 
 public:
 
