@@ -20,6 +20,7 @@ public class Playground : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[] {
 			"UnrealEd",
 			"EnhancedInput",
+			"BlueprintGraph",
 			"Engine",
 			"CrabToolsUE5",});
 

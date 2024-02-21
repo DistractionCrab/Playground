@@ -11,7 +11,8 @@
 			"AdditionalDependencies": [
 				"Engine",
 				"CoreUObject",
-				"AnimGraph"
+				"AnimGraph",
+				"UMG"
 			]
 		}
 	],
@@ -31,5 +32,9 @@
 			"Name": "RigLogic",
 			"Enabled": true
 		},
+		{
+			"Name": "NiagaraFluids",
+			"Enabled": true
+		}
 	]
 }

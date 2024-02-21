@@ -12,6 +12,20 @@ enum class ECastAnimationID : uint8 {
 	FIREBALL           UMETA(DisplayName = "Fireball"),    
 };
 
+USTRUCT(BlueprintType)
+struct FScalingData 
+{
+	GENERATED_USTRUCT_BODY()
+
+public:
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = LevelUp)
+	FName Name;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = LevelUp)
+	float FireScale;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = LevelUp)
+	float SharpScale;
+};
 
 /**
 	Structure used for spell data. This defines how spells are cast, their spellbook display, and other properties
@@ -42,6 +56,9 @@ public:
 	/** Icon to use for Spellbook display */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = LevelUp)
 	TSubclassOf<AActor> SpellClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = LevelUp)
+	FScalingData Scaling;
 };
 
 /**

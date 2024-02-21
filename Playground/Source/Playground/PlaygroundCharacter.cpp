@@ -41,7 +41,7 @@ void Machine::UpdateState(PlaygroundCharacterState* To) {
 }
 
 State* State::AttemptLook() {
-	if (this->GetActor()->Controller != nullptr && !GetActor()->GetPerspective()->IsBound())
+	if (this->GetActor()->Controller != nullptr && !GetActor()->GetPerspective()->HasTarget())
 	{
 		// add yaw and pitch input to controller
 		this->GetActor()->AddControllerYawInput(this->Owner->LookAxis.X);
@@ -379,7 +379,7 @@ void Machine::Walking::ApplyMovement() {
 	FRotator Rotation;
 
 	auto Perspective = GetActor()->GetPerspective();
-	if (Perspective->IsBound()) {
+	if (Perspective->HasTarget()) {
 		Rotation = Perspective->GetPerspective();
 	} else {
 		Rotation = GetActor()->Controller->GetControlRotation();
