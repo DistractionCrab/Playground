@@ -1,3 +1,6 @@
 [submodule "Playground/Plugins/CrabToolsUE5"]
 	path = Playground/Plugins/CrabToolsUE5
-	url = https://github.com/DistractionCrab/CrabUnrealTools
+	url = https://github.com/DistractionCrab/CrabToolsUE5
+[submodule "Playground/Plugins/--force"]
+	path = Playground/Plugins/--force
+	url = https://github.com/DistractionCrab/CrabToolsUE5
